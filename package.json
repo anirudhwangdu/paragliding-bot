@@ -1,0 +1,18 @@
+{
+  "name": "paragliding-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Cloud API bot for paragliding/motor sport adventure tourism - FAQ + bookings",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "lowdb": "^7.0.1",
+    "nanoid": "^5.0.7"
+  }
+}
