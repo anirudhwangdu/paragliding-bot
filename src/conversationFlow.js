@@ -64,7 +64,11 @@ async function sendLocationChoice(to) {
 
 async function sendPackageList(to, locationKey) {
   const loc = LOCATIONS[locationKey];
-  await sendList(to, `${loc.label} packages:`, "View Packages", loc.sections);
+  const cleanSections = loc.sections.map((section) => ({
+    title: section.title,
+    rows: section.rows.map(({ id, title, description }) => ({ id, title, description })),
+  }));
+  await sendList(to, `${loc.label} packages:`, "View Packages", cleanSections);
 }
 
 async function askPassengerName(to, session) {
