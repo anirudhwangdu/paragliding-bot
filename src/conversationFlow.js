@@ -1,4 +1,3 @@
-import { sendText, sendButtons, sendList } from "./whatsappClient.js";
 import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
