@@ -1,41 +1,40 @@
 export const FAQ = {
-  pricing:
-    "💰 *Pricing — Tandem Paramotor Joyrides*\n\n" +
-    "- Tandem Introductory (9-10 min): ₹4,500\n" +
-    "- SkySail Thriller (14-16 min, extra altitude): ₹5,999\n" +
-    "- Fluff & Fly — bring your pet! (13-15 min): ₹5,999\n" +
-    "- Birthday Blast — with sky surprises! (14-16 min): ₹5,999\n\n" +
-    "All packages include Insta 360° photos & video and a certified pilot.",
+  features:
+    "⭐ *Key Features*\n\n" +
+    "- Certified expert pilots handle takeoff, flight path & landing\n" +
+    "- Top-tier, pre-flight-inspected safety gear\n" +
+    "- Insta360 footage & professional cinematic edits available\n" +
+    "- Eco-friendly flying, minimal environmental impact\n" +
+    "- Scenic rides to high-adrenaline turns, couple & pet-friendly flights",
 
-  gear:
-    "🪂 *Gear & Safety*\n\n" +
-    "Certified professional pilots, premium safety equipment, and " +
-    "5000+ successful tandem flights completed. Every flight follows " +
-    "rigorous safety standards.",
+  faq1:
+    "❓ *Common Questions*\n\n" +
+    "*What is a tandem paramotor flight?*\nYou fly attached to a certified pilot — no experience needed, the pilot handles everything.\n\n" +
+    "*Do I need experience?*\nNo. The pilot manages takeoff, maneuvers, and landing.\n\n" +
+    "*Can anyone fly?*\nMost people in generally good health can join. Please consult a doctor first if you have a medical condition.",
 
-  weight:
-    `⚖️ *Weight & Fitness*\n\nMax rider weight: ${process.env.MAX_RIDER_WEIGHT_KG || 110}kg. ` +
-    "No major cardiac/spine conditions. Minimum age 12 with guardian consent.",
-
-  weather:
-    "🌤️ *Weather Policy*\n\n" +
-    "Flights depend on live wind/weather conditions. If your slot is " +
-    "unsafe, we'll offer a free reschedule — no questions asked.",
+  faq2:
+    "❓ *More Questions*\n\n" +
+    "*Can I bring my phone/camera?*\nYes, if secured with a strap or mount. Onboard capture is also available as a package add-on.\n\n" +
+    "*Is it safe?*\nYes — regular pre-flight inspections, certified pilots, aviation safety standards.\n\n" +
+    "*What should I wear?*\nComfortable clothes, closed-toe shoes, sunglasses & sunscreen. Avoid loose scarves/accessories.\n\n" +
+    "*Best time to fly?*\nEarly morning or late afternoon — smoothest winds, best light.",
 
   location:
-    "📍 *Location*\n\nVijaya Park backside, Alleppey Beach, Alappuzha, Kerala.\n\n" +
-    "Soar above golden beaches and serene backwaters — Alappuzha like never before!",
+    "📍 *Our Locations*\n\n" +
+    "*Alappuzha (Alleppey):* Vijaya Park backside, Alleppey Beach, Kerala\n" +
+    "*Bangalore:* details shared on booking\n\n" +
+    "WhatsApp/Call: +91 89517 71232",
 };
 
 export const FAQ_MENU_SECTIONS = [
   {
-    title: "Common Questions",
+    title: "Learn More",
     rows: [
-      { id: "faq_pricing", title: "Pricing", description: "Tour costs & packages" },
-      { id: "faq_gear", title: "Gear & Safety", description: "Equipment & certifications" },
-      { id: "faq_weight", title: "Weight & Fitness", description: "Eligibility requirements" },
-      { id: "faq_weather", title: "Weather Policy", description: "Cancellations & reschedules" },
-      { id: "faq_location", title: "Location", description: "Where to meet us" },
+      { id: "faq_features", title: "Key Features", description: "Pilots, safety, media, eco-friendly" },
+      { id: "faq_faq1", title: "FAQs — Part 1", description: "Tandem basics & who can fly" },
+      { id: "faq_faq2", title: "FAQs — Part 2", description: "Cameras, safety, what to wear" },
+      { id: "faq_location", title: "Locations", description: "Where we fly" },
     ],
   },
 ];

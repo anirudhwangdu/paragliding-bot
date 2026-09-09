@@ -1,14 +1,8 @@
 import { sendText, sendButtons, sendList } from "./whatsappClient.js";
 import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
+import { LOCATIONS, findPackage } from "./packages.js";
 import { nanoid } from "nanoid";
-
-const TOURS = [
-  { id: "tour_intro", title: "Tandem Introductory", description: "₹4,500 · 9-10 min" },
-  { id: "tour_thriller", title: "SkySail Thriller", description: "₹5,999 · 14-16 min" },
-  { id: "tour_pet", title: "Fluff & Fly (pet-friendly)", description: "₹5,999 · 13-15 min" },
-  { id: "tour_birthday", title: "Birthday Blast", description: "₹5,999 · 14-16 min" },
-];
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -23,7 +17,7 @@ export async function handleIncomingMessage(from, message) {
 
   if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
     await resetSession(from);
-    await sendMainMenu(from);
+    await sendWelcome(from);
     return;
   }
 
@@ -38,46 +32,85 @@ export async function handleIncomingMessage(from, message) {
   await routeFreeText(from, text, session);
 }
 
+async function sendWelcome(to) {
+  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
+  await sendMainMenu(to);
+}
+
 async function sendMainMenu(to) {
-  await sendButtons(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nHow can we help today?`, [
-    { id: "menu_faq", title: "📋 FAQs" },
-    { id: "menu_book", title: "🪂 Book a Flight" },
-    { id: "menu_human", title: "🙋 Talk to a Human" },
+  await sendList(to, "How can we help today?", "View Menu", [
+    {
+      title: "Menu",
+      rows: [
+        { id: "menu_book", title: "Book a Flight", description: "Browse packages & book" },
+        { id: "menu_faq", title: "FAQs", description: "Common questions answered" },
+        { id: "menu_human", title: "Talk to a Human", description: "Connect with our team" },
+        { id: "menu_website", title: "Visit our Website", description: "skysailadventures.com" },
+      ],
+    },
   ]);
 }
 
+async function sendLocationChoice(to) {
+  await sendButtons(to, "Which location would you like to fly at?", [
+    { id: "loc_bangalore", title: "Bangalore" },
+    { id: "loc_alleppey", title: "Alleppey" },
+  ]);
+}
+
+async function sendPackageList(to, locationKey) {
+  const loc = LOCATIONS[locationKey];
+  await sendList(to, `${loc.label} packages:`, "View Packages", loc.sections);
+}
+
 async function routeInteractive(from, id, session) {
-  if (id === "menu_faq") {
-    await sendList(from, "What would you like to know?", "View FAQs", FAQ_MENU_SECTIONS);
+  if (id === "menu_book") {
+    await sendLocationChoice(from);
     return;
   }
-  if (id === "menu_book") {
-    session.step = "CHOOSE_TOUR";
-    await saveSession(from, session);
-    await sendList(from, "Pick a flight experience:", "View Tours", [{ title: "Tours", rows: TOURS }]);
+  if (id === "menu_faq") {
+    await sendList(from, "What would you like to know?", "View FAQs", FAQ_MENU_SECTIONS);
     return;
   }
   if (id === "menu_human") {
     await handOffToHuman(from);
     return;
   }
+  if (id === "menu_website") {
+    await sendText(from, "🌐 Visit us at: https://www.skysailadventures.com");
+    return;
+  }
+
+  if (id === "loc_bangalore" || id === "loc_alleppey") {
+    const key = id === "loc_bangalore" ? "bangalore" : "alleppey";
+    session.draft = { location: LOCATIONS[key].label };
+    session.step = "CHOOSE_PACKAGE";
+    await saveSession(from, session);
+    await sendPackageList(from, key);
+    return;
+  }
 
   if (id.startsWith("faq_")) {
     const key = id.replace("faq_", "");
     await sendText(from, FAQ[key] || "Sorry, I don't have that info yet.");
-    await sendButtons(from, "Anything else?", [
-      { id: "menu_faq", title: "📋 More FAQs" },
-      { id: "menu_book", title: "🪂 Book a Flight" },
-    ]);
+    await sendMainMenu(from);
     return;
   }
 
-  if (id.startsWith("tour_")) {
-    const tour = TOURS.find((t) => t.id === id);
-    session.draft = { tour: tour.title, price: tour.description };
+  const pkg = findPackage(id);
+  if (pkg) {
+    session.draft = { ...session.draft, package: pkg.title, price: pkg.description };
+    session.step = "ASK_PASSENGERS";
+    await saveSession(from, session);
+    await sendText(from, `Great choice — *${pkg.title}* (${pkg.description}).\n\nHow many passengers will be flying?`);
+    return;
+  }
+
+  if (id === "time_morning" || id === "time_evening") {
+    session.draft.timePreference = id === "time_morning" ? "Morning" : "Evening";
     session.step = "ASK_NAME";
     await saveSession(from, session);
-    await sendText(from, `Great choice — *${tour.title}*.\n\nWhat's your full name?`);
+    await sendText(from, "What's your full name?");
     return;
   }
 
@@ -86,16 +119,26 @@ async function routeInteractive(from, id, session) {
       id: nanoid(8),
       phone: from,
       ...session.draft,
-      status: "pending_weather_check",
+      status: "pending_confirmation_call",
       createdAt: new Date().toISOString(),
     };
     await saveBooking(booking);
     await sendText(
       from,
       `✅ Booking received! Reference: *${booking.id}*\n\n` +
-        `We'll confirm your exact time slot the evening before your flight, ` +
-        `pending weather. You'll get a reminder 24h and 2h before.`
+        `${booking.location} — ${booking.package}\n` +
+        `Passengers: ${booking.passengers} · Date: ${booking.date} · ${booking.timePreference}\n\n` +
+        `Our team will call you shortly to confirm your exact time slot. ` +
+        `A confirmation has also been noted against your email: ${booking.email}.`
     );
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      await sendText(
+        process.env.HUMAN_HANDOFF_NUMBER,
+        `🆕 New booking ${booking.id}\n${booking.name}, age ${booking.age}, ${booking.weight}kg\n` +
+          `${booking.location} — ${booking.package}\nPax: ${booking.passengers} · ${booking.date} · ${booking.timePreference}\n` +
+          `Phone: ${booking.phone} · Email: ${booking.email}`
+      );
+    }
     await resetSession(from);
     return;
   }
@@ -110,11 +153,34 @@ async function routeInteractive(from, id, session) {
 
 async function routeFreeText(from, text, session) {
   switch (session.step) {
+    case "ASK_PASSENGERS":
+      session.draft.passengers = text;
+      session.step = "ASK_DATE";
+      await saveSession(from, session);
+      await sendText(from, "What date would you like to fly? (e.g. 25 Sept)");
+      return;
+
+    case "ASK_DATE":
+      session.draft.date = text;
+      await saveSession(from, session);
+      await sendButtons(from, "Preferred time of day?", [
+        { id: "time_morning", title: "🌅 Morning" },
+        { id: "time_evening", title: "🌇 Evening" },
+      ]);
+      return;
+
     case "ASK_NAME":
       session.draft.name = text;
+      session.step = "ASK_AGE";
+      await saveSession(from, session);
+      await sendText(from, "What's your age?");
+      return;
+
+    case "ASK_AGE":
+      session.draft.age = text;
       session.step = "ASK_WEIGHT";
       await saveSession(from, session);
-      await sendText(from, "What's your approximate weight in kg? (needed for gear sizing/safety)");
+      await sendText(from, "What's your approximate weight in kg? (needed for safety/gear sizing)");
       return;
 
     case "ASK_WEIGHT": {
@@ -134,30 +200,38 @@ async function routeFreeText(from, text, session) {
         return;
       }
       session.draft.weight = weight;
-      session.step = "ASK_DATE";
+      session.step = "ASK_EMAIL";
       await saveSession(from, session);
-      await sendText(from, "What date would you like to fly? (e.g. 25 Aug)");
+      await sendText(from, "What's your email address? (for your booking confirmation)");
       return;
     }
 
-    case "ASK_DATE":
-      session.draft.date = text;
+    case "ASK_EMAIL": {
+      if (!text.includes("@")) {
+        await sendText(from, "That doesn't look like a valid email — please re-enter it.");
+        return;
+      }
+      session.draft.email = text;
       session.step = "CONFIRM";
       await saveSession(from, session);
+      const d = session.draft;
       await sendButtons(
         from,
-        `Please confirm:\n\n` +
-          `🪂 Tour: ${session.draft.tour}\n` +
-          `👤 Name: ${session.draft.name}\n` +
-          `⚖️ Weight: ${session.draft.weight}kg\n` +
-          `📅 Date: ${session.draft.date}\n\n` +
-          `Note: slots are confirmed pending weather check morning-of.`,
+        `Please confirm your booking:\n\n` +
+          `📍 ${d.location} — ${d.package}\n` +
+          `💰 ${d.price}\n` +
+          `👥 Passengers: ${d.passengers}\n` +
+          `📅 Date: ${d.date} (${d.timePreference})\n` +
+          `👤 ${d.name}, age ${d.age}, ${d.weight}kg\n` +
+          `📧 ${d.email}\n\n` +
+          `We'll call to confirm your exact slot.`,
         [
           { id: "confirm_yes", title: "✅ Confirm" },
           { id: "confirm_no", title: "❌ Cancel" },
         ]
       );
       return;
+    }
 
     default:
       await sendMainMenu(from);
@@ -171,19 +245,14 @@ async function handOffToHuman(to) {
       "For urgent safety issues, please call us directly."
   );
   if (process.env.HUMAN_HANDOFF_NUMBER) {
-    await sendText(
-      process.env.HUMAN_HANDOFF_NUMBER,
-      `⚠️ Handoff requested by ${to}. Please check the chat directly.`
-    );
+    await sendText(process.env.HUMAN_HANDOFF_NUMBER, `⚠️ Handoff requested by ${to}. Please check the chat directly.`);
   }
 }
 
 function extractText(message) {
   if (message.type === "text") return message.text.body;
   if (message.type === "interactive") {
-    return (
-      message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || ""
-    );
+    return message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || "";
   }
   return "";
 }
