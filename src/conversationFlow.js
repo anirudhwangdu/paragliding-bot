@@ -4,6 +4,7 @@ import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { nanoid } from "nanoid";
 
+
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
 export async function handleIncomingMessage(from, message) {
@@ -63,6 +64,11 @@ async function sendPackageList(to, locationKey) {
   await sendList(to, `${loc.label} packages:`, "View Packages", loc.sections);
 }
 
+async function askPassengerName(to, session) {
+  const n = session.draft.passengerList.length + 1;
+  await sendText(to, `Passenger ${n} of ${session.draft.passengerCount} — what's their full name?`);
+}
+
 async function routeInteractive(from, id, session) {
   if (id === "menu_book") {
     await sendLocationChoice(from);
@@ -83,7 +89,7 @@ async function routeInteractive(from, id, session) {
 
   if (id === "loc_bangalore" || id === "loc_alleppey") {
     const key = id === "loc_bangalore" ? "bangalore" : "alleppey";
-    session.draft = { location: LOCATIONS[key].label };
+    session.draft = { location: LOCATIONS[key].label, locationKey: key };
     session.step = "CHOOSE_PACKAGE";
     await saveSession(from, session);
     await sendPackageList(from, key);
@@ -97,20 +103,42 @@ async function routeInteractive(from, id, session) {
     return;
   }
 
+  // Package selected from list -> show detail + confirm step (not straight into booking)
   const pkg = findPackage(id);
   if (pkg) {
-    session.draft = { ...session.draft, package: pkg.title, price: pkg.description };
+    session.draft.selectedPackageId = pkg.id;
+    session.step = "PACKAGE_DETAIL";
+    await saveSession(from, session);
+    await sendButtons(from, pkg.details, [
+      { id: "pkg_book", title: "✅ Book This" },
+      { id: "pkg_other", title: "🔄 Other Packages" },
+    ]);
+    return;
+  }
+
+  if (id === "pkg_book") {
+    const pkg = findPackage(session.draft.selectedPackageId);
+    session.draft.package = pkg.title;
+    session.draft.price = pkg.description;
     session.step = "ASK_PASSENGERS";
     await saveSession(from, session);
-    await sendText(from, `Great choice — *${pkg.title}* (${pkg.description}).\n\nHow many passengers will be flying?`);
+    await sendText(from, "How many passengers will be flying?");
+    return;
+  }
+
+  if (id === "pkg_other") {
+    session.step = "CHOOSE_PACKAGE";
+    await saveSession(from, session);
+    await sendPackageList(from, session.draft.locationKey);
     return;
   }
 
   if (id === "time_morning" || id === "time_evening") {
     session.draft.timePreference = id === "time_morning" ? "Morning" : "Evening";
-    session.step = "ASK_NAME";
+    session.draft.passengerList = [];
+    session.step = "ASK_PAX_NAME";
     await saveSession(from, session);
-    await sendText(from, "What's your full name?");
+    await askPassengerName(from, session);
     return;
   }
 
@@ -123,19 +151,25 @@ async function routeInteractive(from, id, session) {
       createdAt: new Date().toISOString(),
     };
     await saveBooking(booking);
+    await appendBookingToSheet(booking);
+    const paxSummary = booking.passengerList
+      .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
+      .join("\n");
     await sendText(
       from,
       `✅ Booking received! Reference: *${booking.id}*\n\n` +
         `${booking.location} — ${booking.package}\n` +
-        `Passengers: ${booking.passengers} · Date: ${booking.date} · ${booking.timePreference}\n\n` +
+        `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
+        `Date: ${booking.date} · ${booking.timePreference}\n\n` +
         `Our team will call you shortly to confirm your exact time slot. ` +
         `A confirmation has also been noted against your email: ${booking.email}.`
     );
     if (process.env.HUMAN_HANDOFF_NUMBER) {
       await sendText(
         process.env.HUMAN_HANDOFF_NUMBER,
-        `🆕 New booking ${booking.id}\n${booking.name}, age ${booking.age}, ${booking.weight}kg\n` +
-          `${booking.location} — ${booking.package}\nPax: ${booking.passengers} · ${booking.date} · ${booking.timePreference}\n` +
+        `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
+          `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
+          `Date: ${booking.date} · ${booking.timePreference}\n` +
           `Phone: ${booking.phone} · Email: ${booking.email}`
       );
     }
@@ -153,12 +187,18 @@ async function routeInteractive(from, id, session) {
 
 async function routeFreeText(from, text, session) {
   switch (session.step) {
-    case "ASK_PASSENGERS":
-      session.draft.passengers = text;
+    case "ASK_PASSENGERS": {
+      const count = parseInt(text, 10);
+      if (isNaN(count) || count < 1) {
+        await sendText(from, "Please send a valid number of passengers, e.g. 1");
+        return;
+      }
+      session.draft.passengerCount = count;
       session.step = "ASK_DATE";
       await saveSession(from, session);
       await sendText(from, "What date would you like to fly? (e.g. 25 Sept)");
       return;
+    }
 
     case "ASK_DATE":
       session.draft.date = text;
@@ -169,21 +209,23 @@ async function routeFreeText(from, text, session) {
       ]);
       return;
 
-    case "ASK_NAME":
-      session.draft.name = text;
-      session.step = "ASK_AGE";
+    case "ASK_PAX_NAME":
+      session.draft.passengerList.push({ name: text });
+      session.step = "ASK_PAX_AGE";
       await saveSession(from, session);
-      await sendText(from, "What's your age?");
+      await sendText(from, `Passenger ${session.draft.passengerList.length} — what's their age?`);
       return;
 
-    case "ASK_AGE":
-      session.draft.age = text;
-      session.step = "ASK_WEIGHT";
+    case "ASK_PAX_AGE": {
+      const current = session.draft.passengerList[session.draft.passengerList.length - 1];
+      current.age = text;
+      session.step = "ASK_PAX_WEIGHT";
       await saveSession(from, session);
-      await sendText(from, "What's your approximate weight in kg? (needed for safety/gear sizing)");
+      await sendText(from, `Passenger ${session.draft.passengerList.length} — what's their approximate weight in kg?`);
       return;
+    }
 
-    case "ASK_WEIGHT": {
+    case "ASK_PAX_WEIGHT": {
       const weight = parseInt(text, 10);
       const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
       if (isNaN(weight)) {
@@ -199,10 +241,19 @@ async function routeFreeText(from, text, session) {
         await resetSession(from);
         return;
       }
-      session.draft.weight = weight;
-      session.step = "ASK_EMAIL";
+      const current = session.draft.passengerList[session.draft.passengerList.length - 1];
+      current.weight = weight;
       await saveSession(from, session);
-      await sendText(from, "What's your email address? (for your booking confirmation)");
+
+      if (session.draft.passengerList.length < session.draft.passengerCount) {
+        session.step = "ASK_PAX_NAME";
+        await saveSession(from, session);
+        await askPassengerName(from, session);
+      } else {
+        session.step = "ASK_EMAIL";
+        await saveSession(from, session);
+        await sendText(from, "What's the best email address for your booking confirmation?");
+      }
       return;
     }
 
@@ -215,14 +266,16 @@ async function routeFreeText(from, text, session) {
       session.step = "CONFIRM";
       await saveSession(from, session);
       const d = session.draft;
+      const paxSummary = d.passengerList
+        .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
+        .join("\n");
       await sendButtons(
         from,
         `Please confirm your booking:\n\n` +
           `📍 ${d.location} — ${d.package}\n` +
           `💰 ${d.price}\n` +
-          `👥 Passengers: ${d.passengers}\n` +
+          `👥 Passengers (${d.passengerCount}):\n${paxSummary}\n` +
           `📅 Date: ${d.date} (${d.timePreference})\n` +
-          `👤 ${d.name}, age ${d.age}, ${d.weight}kg\n` +
           `📧 ${d.email}\n\n` +
           `We'll call to confirm your exact slot.`,
         [
@@ -234,6 +287,7 @@ async function routeFreeText(from, text, session) {
     }
 
     default:
+      await sendText(from, "Sorry, I didn't quite get that — here's our menu:");
       await sendMainMenu(from);
   }
 }
