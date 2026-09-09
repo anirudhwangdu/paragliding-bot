@@ -34,10 +34,10 @@ export async function handleIncomingMessage(from, message) {
 }
 
 async function sendWelcome(to) {
-  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
   if (process.env.WELCOME_VIDEO_URL) {
     await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
   }
+  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
   await sendMainMenu(to);
 }
 
