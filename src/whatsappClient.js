@@ -21,6 +21,15 @@ export async function sendText(to, body) {
   });
 }
 
+export async function sendVideo(to, videoUrl, caption) {
+  return client().post("/messages", {
+    messaging_product: "whatsapp",
+    to,
+    type: "video",
+    video: { link: videoUrl, caption: caption || "" },
+  });
+}
+
 export async function sendButtons(to, bodyText, buttons) {
   return client().post("/messages", {
     messaging_product: "whatsapp",
