@@ -295,7 +295,7 @@ async function routeFreeText(from, text, session) {
 
     default:
       await sendText(from, "Sorry, I didn't quite get that — here's our menu:");
-      await sendMainMenu(from);
+      await sendWelcome(from);
   }
 }
 
