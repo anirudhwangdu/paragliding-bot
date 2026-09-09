@@ -1,65 +1,40 @@
-export const LOCATIONS = {
-  bangalore: {
-    label: "Bangalore",
-    sections: [
-      {
-        title: "Premium Packages",
-        rows: [
-          { id: "blr_scenic", title: "Skysail Scenic Ride", description: "₹9,999/person · 25-30 min · up to 1500ft",
-            details: "🪂 *Skysail Scenic Ride*\n₹9,999/person\nDuration: 25-30 min | Altitude: up to 1,500ft\nIncludes: Scenic flight & full Insta360 footage." },
-          { id: "blr_thriller", title: "Thriller Scenic Exp", description: "Most Popular · ₹14,999/person · 35-40 min · up to 2500ft",
-            details: "🪂 *Thriller Scenic Experience* (Most Popular)\n₹14,999/person\nDuration: 35-40 min | Altitude: up to 2,500ft\nIncludes: Extended flight, cinematic edited reel & full Insta360 footage." },
-          { id: "blr_sunset", title: "Sunset Solo Experience", description: "₹16,999/person · 35-40 min · golden hour flight",
-            details: "🪂 *Sunset Solo Experience*\n₹16,999/person\nDuration: 35-40 min | Altitude: up to 2,500ft\nIncludes: Golden hour sunset flight & cinematic edited reel." },
-          { id: "blr_elite", title: "Skysail Elite Ride", description: "₹18,999/person · 40-45 min · premium cinematic edit",
-            details: "🪂 *Skysail Elite Ride*\n₹18,999/person\nDuration: 40-45 min | Altitude: up to 2,500ft\nIncludes: Smooth turns, panoramic views, premium cinematic edit & full Insta360 footage." },
-          { id: "blr_couple", title: "Love in the Air", description: "₹24,999/couple · 40-45 min each · side-by-side flight",
-            details: "🪂 *Love in the Air* (Elite Couple Experience)\n₹24,999/couple\nDuration: 40-45 min each | Altitude: up to 2,500ft\nIncludes: Simultaneous side-by-side flight, cinematic couple highlight video & individual Insta360 footage." },
-        ],
-      },
-      {
-        title: "Classic Packages",
-        rows: [
-          { id: "blr_intro", title: "Tandem Introductory", description: "₹3,999/person · 10 min · up to 1000ft",
-            details: "🪂 *Tandem Introductory Flight*\n₹3,999/person\nDuration: 10 min | Altitude: up to 1,000ft MSL\nIdeal for first-time flyers seeking a gentle intro to the sky." },
-          { id: "blr_classicthr", title: "SkySail Thriller Flight", description: "₹6,999/person · 15 min · up to 2000ft",
-            details: "🪂 *SkySail Thriller Flight*\n₹6,999/person\nDuration: 15 min | Altitude: up to 2,000ft MSL\nIdeal for thrill-seekers looking for daring turns and higher adrenaline." },
-          { id: "blr_birthday", title: "Birthday Blast Off!", description: "₹6,999/person · 20 min · birthday special",
-            details: "🪂 *Birthday Blast Off!*\n₹6,999/person\nDuration: 20 min | Altitude: up to 2,000ft MSL\nIdeal for special birthday celebrations and surprises." },
-          { id: "blr_pet", title: "Fluff 'n' Flight", description: "₹6,999/pair · 10 min · 1 adult + 1 pet",
-            details: "🪂 *Fluff 'n' Flight*\n₹6,999/pair\nDuration: 10 min | Altitude: up to 1,500ft MSL\nIncludes: 1 adult + 1 pet tandem flight." },
-          { id: "blr_duo", title: "Tandem Sky Duo", description: "₹5,999/pair · 10 min · 1 adult + 1 child",
-            details: "🪂 *Tandem Sky Duo*\n₹5,999/pair\nDuration: 10 min | Altitude: up to 1,000ft MSL\nIncludes: 1 adult + 1 child tandem flight." },
-        ],
-      },
-    ],
-  },
-  alleppey: {
-    label: "Alleppey",
-    sections: [
-      {
-        title: "Flight Packages",
-        rows: [
-          { id: "alp_intro", title: "Tandem Introductory", description: "₹4,500/person · 4-5 min · Insta360 video included",
-            details: "🪂 *Tandem Introductory*\n₹4,500/person\nDuration: 4-5 min\nIncludes: Tandem flight with a professional pilot & Insta360 video.\n\"Short ride. Big memories!\"" },
-          { id: "alp_thriller", title: "SkySail Thriller", description: "₹5,999/person · 5-6 min · extra altitude & thrills",
-            details: "🪂 *SkySail Thriller*\n₹5,999/person\nDuration: 5-6 min\nIncludes: Extra altitude & thrills, Insta360 photos & video.\n\"Higher. Longer. Unforgettable.\"" },
-          { id: "alp_pet", title: "Fluff & Fly", description: "₹5,999/person · 5-6 min · pet-friendly flight",
-            details: "🪂 *Fluff & Fly*\n₹5,999/person\nDuration: 5-6 min\nIncludes: Tandem flight, Insta360 photos & video.\nDesigned for pet lovers flying with their furry companion." },
-          { id: "alp_birthday", title: "Birthday Blast", description: "₹5,999/person · 5-6 min · birthday surprises",
-            details: "🪂 *Birthday Blast*\n₹5,999/person\nDuration: 5-6 min\nIncludes: Tandem flight, Insta360 photos & video, birthday surprises in the sky." },
-        ],
-      },
-    ],
-  },
+export const FAQ = {
+  features:
+    "⭐ *Key Features*\n\n" +
+    "- Certified expert pilots handle takeoff, flight path & landing\n" +
+    "- Top-tier, pre-flight-inspected safety gear\n" +
+    "- Insta360 footage & professional cinematic edits available\n" +
+    "- Eco-friendly flying, minimal environmental impact\n" +
+    "- Scenic rides to high-adrenaline turns, couple & pet-friendly flights",
+
+  faq1:
+    "❓ *Common Questions*\n\n" +
+    "*What is a tandem paramotor flight?*\nYou fly attached to a certified pilot — no experience needed, the pilot handles everything.\n\n" +
+    "*Do I need experience?*\nNo. The pilot manages takeoff, maneuvers, and landing.\n\n" +
+    "*Can anyone fly?*\nMost people in generally good health can join. Please consult a doctor first if you have a medical condition.",
+
+  faq2:
+    "❓ *More Questions*\n\n" +
+    "*Can I bring my phone/camera?*\nYes, if secured with a strap or mount. Onboard capture is also available as a package add-on.\n\n" +
+    "*Is it safe?*\nYes — regular pre-flight inspections, certified pilots, aviation safety standards.\n\n" +
+    "*What should I wear?*\nComfortable clothes, closed-toe shoes, sunglasses & sunscreen. Avoid loose scarves/accessories.\n\n" +
+    "*Best time to fly?*\nEarly morning or late afternoon — smoothest winds, best light.",
+
+  location:
+    "📍 *Our Locations*\n\n" +
+    "*Alappuzha (Alleppey):* Vijaya Park backside, Alleppey Beach, Kerala\n\n" +
+    "*Bangalore:* Shivaram Estate, Jangamakote village and post, Chickballapur Taluk and district, Bangalore, Karnataka — 562102\n\n" +
+    "WhatsApp/Call: +91 94964 78823",
 };
 
-export function findPackage(id) {
-  for (const loc of Object.values(LOCATIONS)) {
-    for (const section of loc.sections) {
-      const found = section.rows.find((r) => r.id === id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
+export const FAQ_MENU_SECTIONS = [
+  {
+    title: "Learn More",
+    rows: [
+      { id: "faq_features", title: "Key Features", description: "Pilots, safety, media, eco-friendly" },
+      { id: "faq_faq1", title: "FAQs — Part 1", description: "Tandem basics & who can fly" },
+      { id: "faq_faq2", title: "FAQs — Part 2", description: "Cameras, safety, what to wear" },
+      { id: "faq_location", title: "Locations", description: "Where we fly" },
+    ],
+  },
+];
