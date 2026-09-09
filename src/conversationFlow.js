@@ -3,6 +3,7 @@ import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { nanoid } from "nanoid";
+import { sendText, sendButtons, sendList, sendVideo } from "./whatsappClient.js";
 
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
@@ -35,6 +36,9 @@ export async function handleIncomingMessage(from, message) {
 
 async function sendWelcome(to) {
   await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
+  if (process.env.WELCOME_VIDEO_URL) {
+    await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
+  }
   await sendMainMenu(to);
 }
 
