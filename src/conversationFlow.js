@@ -72,10 +72,9 @@ async function sendPackageList(to, locationKey) {
 }
 
 async function askPassengerDetails(to, session) {
-  const n = session.draft.passengerList.length + 1;
   const total = session.draft.passengerCount;
-  const formUrl = `https://paragliding-bot.onrender.com/passenger-form?to=${to}&n=${n}&total=${total}`;
-  await sendText(to, `Passenger ${n} of ${total} — please fill in their details:\n${formUrl}`);
+  const formUrl = `https://paragliding-bot.onrender.com/passenger-form?to=${to}&total=${total}`;
+  await sendText(to, `Please fill in your ${total > 1 ? total + " passengers'" : "passenger's"} details:\n${formUrl}`);
 }
 
 async function routeInteractive(from, id, session) {
@@ -250,27 +249,23 @@ async function routeFreeText(from, text, session) {
   }
 }
 
-export async function handleFormSubmission({ phone, name, age, weight }) {
+export async function handleBulkFormSubmission({ phone, passengers }) {
   const session = getSession(phone);
-  const w = parseInt(weight, 10);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
 
-  if (isNaN(w) || w > maxWeight) {
-    await sendText(phone, `That weight (${weight}kg) exceeds our ${maxWeight}kg safety limit. Reply "human" to discuss options.`);
-    await resetSession(phone);
-    return;
+  for (const p of passengers) {
+    const w = parseInt(p.weight, 10);
+    if (isNaN(w) || w > maxWeight) {
+      await sendText(phone, `One passenger's weight (${p.weight}kg) exceeds our ${maxWeight}kg safety limit. Reply "human" to discuss options.`);
+      await resetSession(phone);
+      return;
+    }
+    session.draft.passengerList.push({ name: p.name, age: p.age, weight: w });
   }
 
-  session.draft.passengerList.push({ name, age, weight: w });
+  session.step = "ASK_EMAIL";
   await saveSession(phone, session);
-
-  if (session.draft.passengerList.length < session.draft.passengerCount) {
-    await askPassengerDetails(phone, session);
-  } else {
-    session.step = "ASK_EMAIL";
-    await saveSession(phone, session);
-    await sendText(phone, "What's the best email address for your booking confirmation?");
-  }
+  await sendText(phone, "What's the best email address for your booking confirmation?");
 }
 
 async function handOffToHuman(to) {
