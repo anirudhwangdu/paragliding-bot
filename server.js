@@ -50,9 +50,6 @@ app.get("/bookings", (req, res) => {
 
 app.get("/", (req, res) => res.send("Paragliding WhatsApp bot is running."));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
-
 app.get("/passenger-form", (req, res) => {
   const to = req.query.to || "";
   const n = req.query.n || "1";
@@ -81,10 +78,12 @@ function renderFormPage(to, n, total, botNumber) {
 body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
 h2{color:#1a3c6e;}
 input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
-button{width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;}
+button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+#thankyou{display:none;text-align:center;}
 </style>
 </head>
 <body>
+<div id="formWrap">
 <h2>Passenger ${n} of ${total}</h2>
 <form id="paxForm">
   <input type="text" id="name" placeholder="Full Name" required>
@@ -92,6 +91,12 @@ button{width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border
   <input type="number" id="weight" placeholder="Weight (kg)" required>
   <button type="submit">Submit</button>
 </form>
+</div>
+<div id="thankyou">
+  <h2>✅ Details saved!</h2>
+  <p>Redirecting you back to WhatsApp...</p>
+  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
+</div>
 <script>
 document.getElementById('paxForm').addEventListener('submit', async function(e){
   e.preventDefault();
@@ -106,9 +111,14 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
   });
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('thankyou').style.display = 'block';
   window.location.href = "https://wa.me/${botNumber}";
 });
 </script>
 </body>
 </html>`;
 }
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
