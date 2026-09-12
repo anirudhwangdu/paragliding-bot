@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import { handleIncomingMessage } from "./src/conversationFlow.js";
+import { handleIncomingMessage, handleFormSubmission } from "./src/conversationFlow.js";
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 
@@ -52,3 +52,63 @@ app.get("/", (req, res) => res.send("Paragliding WhatsApp bot is running."));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+
+app.get("/passenger-form", (req, res) => {
+  const to = req.query.to || "";
+  const n = req.query.n || "1";
+  const total = req.query.total || "1";
+  const botNumber = process.env.WHATSAPP_BOT_NUMBER || "";
+  res.send(renderFormPage(to, n, total, botNumber));
+});
+
+app.post("/passenger-form-submit", express.json(), async (req, res) => {
+  try {
+    await handleFormSubmission(req.body);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Form submit error:", err.message);
+    res.status(500).json({ success: false });
+  }
+});
+
+function renderFormPage(to, n, total, botNumber) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Passenger Details</title>
+<style>
+body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
+h2{color:#1a3c6e;}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
+button{width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;}
+</style>
+</head>
+<body>
+<h2>Passenger ${n} of ${total}</h2>
+<form id="paxForm">
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="number" id="age" placeholder="Age" required>
+  <input type="number" id="weight" placeholder="Weight (kg)" required>
+  <button type="submit">Submit</button>
+</form>
+<script>
+document.getElementById('paxForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const body = {
+    phone: "${to}",
+    name: document.getElementById('name').value,
+    age: document.getElementById('age').value,
+    weight: document.getElementById('weight').value,
+  };
+  await fetch('/passenger-form-submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  window.location.href = "https://wa.me/${botNumber}";
+});
+</script>
+</body>
+</html>`;
+}

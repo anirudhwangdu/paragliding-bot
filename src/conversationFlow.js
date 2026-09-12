@@ -3,7 +3,7 @@ import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo } from "./whatsappClient.js";
-
+import { appendBookingToSheet } from "./sheets.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -71,9 +71,11 @@ async function sendPackageList(to, locationKey) {
   await sendList(to, `${loc.label} packages:`, "View Packages", cleanSections);
 }
 
-async function askPassengerName(to, session) {
+async function askPassengerDetails(to, session) {
   const n = session.draft.passengerList.length + 1;
-  await sendText(to, `Passenger ${n} of ${session.draft.passengerCount} — what's their full name?`);
+  const total = session.draft.passengerCount;
+  const formUrl = `https://paragliding-bot.onrender.com/passenger-form?to=${to}&n=${n}&total=${total}`;
+  await sendText(to, `Passenger ${n} of ${total} — please fill in their details:\n${formUrl}`);
 }
 
 async function routeInteractive(from, id, session) {
@@ -110,7 +112,6 @@ async function routeInteractive(from, id, session) {
     return;
   }
 
-  // Package selected from list -> show detail + confirm step (not straight into booking)
   const pkg = findPackage(id);
   if (pkg) {
     session.draft.selectedPackageId = pkg.id;
@@ -124,12 +125,12 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "pkg_book") {
-    const pkg = findPackage(session.draft.selectedPackageId);
-    session.draft.package = pkg.title;
-    session.draft.price = pkg.description;
-    session.step = "ASK_PASSENGERS";
+    const chosen = findPackage(session.draft.selectedPackageId);
+    session.draft.package = chosen.title;
+    session.draft.price = chosen.description;
+    session.step = "ASK_PASSENGERS_DATE";
     await saveSession(from, session);
-    await sendText(from, "How many passengers will be flying?");
+    await sendText(from, `How many passengers, and what date would you like to fly?\ne.g. "2, 25 Sept"`);
     return;
   }
 
@@ -143,9 +144,9 @@ async function routeInteractive(from, id, session) {
   if (id === "time_morning" || id === "time_evening") {
     session.draft.timePreference = id === "time_morning" ? "Morning" : "Evening";
     session.draft.passengerList = [];
-    session.step = "ASK_PAX_NAME";
+    session.step = "AWAITING_PAX_FORM";
     await saveSession(from, session);
-    await askPassengerName(from, session);
+    await askPassengerDetails(from, session);
     return;
   }
 
@@ -194,73 +195,24 @@ async function routeInteractive(from, id, session) {
 
 async function routeFreeText(from, text, session) {
   switch (session.step) {
-    case "ASK_PASSENGERS": {
-      const count = parseInt(text, 10);
+    case "ASK_PASSENGERS_DATE": {
+      const parts = text.split(",").map((p) => p.trim());
+      if (parts.length < 2) {
+        await sendText(from, `Please send both separated by a comma, e.g. "2, 25 Sept"`);
+        return;
+      }
+      const count = parseInt(parts[0], 10);
       if (isNaN(count) || count < 1) {
-        await sendText(from, "Please send a valid number of passengers, e.g. 1");
+        await sendText(from, `Number of passengers must be a number. Please resend, e.g. "2, 25 Sept"`);
         return;
       }
       session.draft.passengerCount = count;
-      session.step = "ASK_DATE";
-      await saveSession(from, session);
-      await sendText(from, "What date would you like to fly? (e.g. 25 Sept)");
-      return;
-    }
-
-    case "ASK_DATE":
-      session.draft.date = text;
+      session.draft.date = parts.slice(1).join(", ");
       await saveSession(from, session);
       await sendButtons(from, "Preferred time of day?", [
         { id: "time_morning", title: "🌅 Morning" },
         { id: "time_evening", title: "🌇 Evening" },
       ]);
-      return;
-
-    case "ASK_PAX_NAME":
-      session.draft.passengerList.push({ name: text });
-      session.step = "ASK_PAX_AGE";
-      await saveSession(from, session);
-      await sendText(from, `Passenger ${session.draft.passengerList.length} — what's their age?`);
-      return;
-
-    case "ASK_PAX_AGE": {
-      const current = session.draft.passengerList[session.draft.passengerList.length - 1];
-      current.age = text;
-      session.step = "ASK_PAX_WEIGHT";
-      await saveSession(from, session);
-      await sendText(from, `Passenger ${session.draft.passengerList.length} — what's their approximate weight in kg?`);
-      return;
-    }
-
-    case "ASK_PAX_WEIGHT": {
-      const weight = parseInt(text, 10);
-      const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
-      if (isNaN(weight)) {
-        await sendText(from, "Please send just the number, e.g. 70");
-        return;
-      }
-      if (weight > maxWeight) {
-        await sendText(
-          from,
-          `Unfortunately our max rider weight is ${maxWeight}kg for safety reasons. ` +
-            `Reply "human" if you'd like to discuss options with our team.`
-        );
-        await resetSession(from);
-        return;
-      }
-      const current = session.draft.passengerList[session.draft.passengerList.length - 1];
-      current.weight = weight;
-      await saveSession(from, session);
-
-      if (session.draft.passengerList.length < session.draft.passengerCount) {
-        session.step = "ASK_PAX_NAME";
-        await saveSession(from, session);
-        await askPassengerName(from, session);
-      } else {
-        session.step = "ASK_EMAIL";
-        await saveSession(from, session);
-        await sendText(from, "What's the best email address for your booking confirmation?");
-      }
       return;
     }
 
@@ -294,8 +246,30 @@ async function routeFreeText(from, text, session) {
     }
 
     default:
-      await sendText(from, "Sorry, I didn't quite get that — here's our menu:");
       await sendWelcome(from);
+  }
+}
+
+export async function handleFormSubmission({ phone, name, age, weight }) {
+  const session = getSession(phone);
+  const w = parseInt(weight, 10);
+  const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
+
+  if (isNaN(w) || w > maxWeight) {
+    await sendText(phone, `That weight (${weight}kg) exceeds our ${maxWeight}kg safety limit. Reply "human" to discuss options.`);
+    await resetSession(phone);
+    return;
+  }
+
+  session.draft.passengerList.push({ name, age, weight: w });
+  await saveSession(phone, session);
+
+  if (session.draft.passengerList.length < session.draft.passengerCount) {
+    await askPassengerDetails(phone, session);
+  } else {
+    session.step = "ASK_EMAIL";
+    await saveSession(phone, session);
+    await sendText(phone, "What's the best email address for your booking confirmation?");
   }
 }
 
