@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { handleIncomingMessage, handleFormSubmission } from "./src/conversationFlow.js";
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
+import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 
 dotenv.config();
 
@@ -52,10 +53,9 @@ app.get("/", (req, res) => res.send("Paragliding WhatsApp bot is running."));
 
 app.get("/passenger-form", (req, res) => {
   const to = req.query.to || "";
-  const n = req.query.n || "1";
   const total = req.query.total || "1";
   const botNumber = process.env.WHATSAPP_BOT_NUMBER || "";
-  res.send(renderFormPage(to, n, total, botNumber));
+  res.send(renderFormPage(to, total, botNumber));
 });
 
 app.post("/passenger-form-submit", express.json(), async (req, res) => {
@@ -68,7 +68,7 @@ app.post("/passenger-form-submit", express.json(), async (req, res) => {
   }
 });
 
-function renderFormPage(to, n, total, botNumber) {
+function renderFormPage(to, total, botNumber) {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -84,12 +84,12 @@ button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:whit
 </head>
 <body>
 <div id="formWrap">
-<h2>Passenger ${n} of ${total}</h2>
+<h2 id="heading">Passenger 1 of ${total}</h2>
 <form id="paxForm">
   <input type="text" id="name" placeholder="Full Name" required>
   <input type="number" id="age" placeholder="Age" required>
   <input type="number" id="weight" placeholder="Weight (kg)" required>
-  <button type="submit">Submit</button>
+  <button type="submit" id="submitBtn">${total > 1 ? "Next" : "Submit"}</button>
 </form>
 </div>
 <div id="thankyou">
@@ -98,18 +98,31 @@ button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:whit
   <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
 </div>
 <script>
+const total = ${total};
+let current = 1;
+const passengers = [];
+
 document.getElementById('paxForm').addEventListener('submit', async function(e){
   e.preventDefault();
-  const body = {
-    phone: "${to}",
-    name: document.getElementById('name').value,
-    age: document.getElementById('age').value,
-    weight: document.getElementById('weight').value,
-  };
+  const name = document.getElementById('name').value;
+  const age = document.getElementById('age').value;
+  const weight = document.getElementById('weight').value;
+  passengers.push({ name, age, weight });
+
+  if (current < total) {
+    current++;
+    document.getElementById('heading').textContent = 'Passenger ' + current + ' of ' + total;
+    document.getElementById('name').value = '';
+    document.getElementById('age').value = '';
+    document.getElementById('weight').value = '';
+    document.getElementById('submitBtn').textContent = current < total ? 'Next' : 'Submit';
+    return;
+  }
+
   await fetch('/passenger-form-submit', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify({ phone: "${to}", passengers })
   });
   document.getElementById('formWrap').style.display = 'none';
   document.getElementById('thankyou').style.display = 'block';
