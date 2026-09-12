@@ -1,6 +1,5 @@
 import express from "express";
 import dotenv from "dotenv";
-import { handleIncomingMessage, handleFormSubmission } from "./src/conversationFlow.js";
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
@@ -60,7 +59,7 @@ app.get("/passenger-form", (req, res) => {
 
 app.post("/passenger-form-submit", express.json(), async (req, res) => {
   try {
-    await handleFormSubmission(req.body);
+    await handleBulkFormSubmission(req.body);
     res.json({ success: true });
   } catch (err) {
     console.error("Form submit error:", err.message);
