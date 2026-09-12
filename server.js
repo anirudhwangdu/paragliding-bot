@@ -78,6 +78,7 @@ body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
 h2{color:#1a3c6e;}
 input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
 button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+button:disabled{opacity:0.6;}
 #thankyou{display:none;text-align:center;}
 </style>
 </head>
@@ -99,10 +100,15 @@ button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:whit
 <script>
 const total = ${total};
 let current = 1;
+let isSubmitting = false;
 const passengers = [];
 
 document.getElementById('paxForm').addEventListener('submit', async function(e){
   e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
+  document.getElementById('submitBtn').disabled = true;
+
   const name = document.getElementById('name').value;
   const age = document.getElementById('age').value;
   const weight = document.getElementById('weight').value;
@@ -115,6 +121,8 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
     document.getElementById('age').value = '';
     document.getElementById('weight').value = '';
     document.getElementById('submitBtn').textContent = current < total ? 'Next' : 'Submit';
+    document.getElementById('submitBtn').disabled = false;
+    isSubmitting = false;
     return;
   }
 
