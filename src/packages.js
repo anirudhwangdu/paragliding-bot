@@ -7,14 +7,10 @@ export const LOCATIONS = {
         rows: [
           { id: "blr_scenic", title: "Skysail Scenic Ride", description: "₹9,999/person · 25-30 min · up to 1500ft",
             details: "🪂 *Skysail Scenic Ride*\n₹9,999/person\nDuration: 25-30 min | Altitude: up to 1,500ft\nIncludes: Scenic flight & full Insta360 footage." },
-          { id: "blr_thriller", title: "Thriller Scenic Exp", description: "Most Popular · ₹14,999/person · 35-40 min · up to 2500ft",
-            details: "🪂 *Thriller Scenic Experience* (Most Popular)\n₹14,999/person\nDuration: 35-40 min | Altitude: up to 2,500ft\nIncludes: Extended flight, cinematic edited reel & full Insta360 footage." },
-          { id: "blr_sunset", title: "Sunset Solo Experience", description: "₹16,999/person · 35-40 min · golden hour flight",
-            details: "🪂 *Sunset Solo Experience*\n₹16,999/person\nDuration: 35-40 min | Altitude: up to 2,500ft\nIncludes: Golden hour sunset flight & cinematic edited reel." },
+          { id: "blr_sunset", title: "Sunset Solo Experience", description: "₹15,999/person · 35-40 min · golden hour flight",
+            details: "🪂 *Sunset Solo Experience*\n₹16,999/person\nDuration: 25-30 min | Altitude: up to 2,500ft\nIncludes: Golden hour sunset flight & cinematic edited reel." },
           { id: "blr_elite", title: "Skysail Elite Ride", description: "₹18,999/person · 40-45 min · premium cinematic edit",
-            details: "🪂 *Skysail Elite Ride*\n₹18,999/person\nDuration: 40-45 min | Altitude: up to 2,500ft\nIncludes: Smooth turns, panoramic views, premium cinematic edit & full Insta360 footage." },
-          { id: "blr_couple", title: "Love in the Air", description: "₹24,999/couple · 40-45 min each · side-by-side flight",
-            details: "🪂 *Love in the Air* (Elite Couple Experience)\n₹24,999/couple\nDuration: 40-45 min each | Altitude: up to 2,500ft\nIncludes: Simultaneous side-by-side flight, cinematic couple highlight video & individual Insta360 footage." },
+            details: "🪂 *Skysail Elite Ride*\n₹14,999/person\nDuration: 25-30 min | Altitude: up to 2,500ft\nIncludes: Smooth turns, panoramic views, premium cinematic edit & full Insta360 footage." }
         ],
       },
       {
@@ -25,7 +21,7 @@ export const LOCATIONS = {
           { id: "blr_classicthr", title: "SkySail Thriller Flight", description: "₹6,999/person · 15 min · up to 2000ft",
             details: "🪂 *SkySail Thriller Flight*\n₹6,999/person\nDuration: 15 min | Altitude: up to 2,000ft MSL\nIdeal for thrill-seekers looking for daring turns and higher adrenaline." },
           { id: "blr_birthday", title: "Birthday Blast Off!", description: "₹6,999/person · 20 min · birthday special",
-            details: "🪂 *Birthday Blast Off!*\n₹6,999/person\nDuration: 20 min | Altitude: up to 2,000ft MSL\nIdeal for special birthday celebrations and surprises." },
+            details: "🪂 *Birthday Blast Off!*\n₹6,999/person\nDuration: 15 min | Altitude: up to 2,000ft MSL\nIdeal for special birthday celebrations and surprises." },
           { id: "blr_pet", title: "Fluff 'n' Flight", description: "₹6,999/pair · 10 min · 1 adult + 1 pet",
             details: "🪂 *Fluff 'n' Flight*\n₹6,999/pair\nDuration: 10 min | Altitude: up to 1,500ft MSL\nIncludes: 1 adult + 1 pet tandem flight." },
           { id: "blr_duo", title: "Tandem Sky Duo", description: "₹5,999/pair · 10 min · 1 adult + 1 child",
