@@ -48,3 +48,14 @@ export async function appendBookingToSheet(booking) {
     console.error("Failed to write to Google Sheet:", err.response?.data || err.message);
   }
 }
+
+export async function getNextBookingId() {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A:A",
+  });
+  const rows = res.data.values || [];
+  const nextNum = rows.length; // header row = 1, so first booking becomes 1
+  return "SKY" + String(nextNum).padStart(4, "0");
+}
