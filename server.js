@@ -79,6 +79,7 @@ h2{color:#1a3c6e;}
 input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
 button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
 button:disabled{opacity:0.6;}
+#emailField{display:none;}
 #thankyou{display:none;text-align:center;}
 </style>
 </head>
@@ -89,6 +90,9 @@ button:disabled{opacity:0.6;}
   <input type="text" id="name" placeholder="Full Name" required>
   <input type="number" id="age" placeholder="Age" required>
   <input type="number" id="weight" placeholder="Weight (kg)" required>
+  <div id="emailField">
+    <input type="email" id="email" placeholder="Email address for booking confirmation">
+  </div>
   <button type="submit" id="submitBtn">${total > 1 ? "Next" : "Submit"}</button>
 </form>
 </div>
@@ -102,6 +106,8 @@ const total = ${total};
 let current = 1;
 let isSubmitting = false;
 const passengers = [];
+
+if (total === 1) document.getElementById('emailField').style.display = 'block';
 
 document.getElementById('paxForm').addEventListener('submit', async function(e){
   e.preventDefault();
@@ -120,16 +126,18 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
     document.getElementById('name').value = '';
     document.getElementById('age').value = '';
     document.getElementById('weight').value = '';
+    if (current === total) document.getElementById('emailField').style.display = 'block';
     document.getElementById('submitBtn').textContent = current < total ? 'Next' : 'Submit';
     document.getElementById('submitBtn').disabled = false;
     isSubmitting = false;
     return;
   }
 
+  const email = document.getElementById('email').value;
   await fetch('/passenger-form-submit', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ phone: "${to}", passengers })
+    body: JSON.stringify({ phone: "${to}", passengers, email })
   });
   document.getElementById('formWrap').style.display = 'none';
   document.getElementById('thankyou').style.display = 'block';

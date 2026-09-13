@@ -1,7 +1,6 @@
 import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
-import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo } from "./whatsappClient.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import * as chrono from "chrono-node";
@@ -78,6 +77,21 @@ async function askPassengerDetails(to, session) {
   await sendText(to, `Please fill in your ${total > 1 ? total + " passengers'" : "passenger's"} details:\n${formUrl}`);
 }
 
+function buildConfirmMessage(d) {
+  const paxSummary = d.passengerList
+    .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
+    .join("\n");
+  return (
+    `Please confirm your booking:\n\n` +
+    `📍 ${d.location} — ${d.package}\n` +
+    `💰 ${d.price}\n` +
+    `👥 Passengers (${d.passengerCount}):\n${paxSummary}\n` +
+    `📅 Date: ${d.date} (${d.timePreference})\n` +
+    `📧 ${d.email}\n\n` +
+    `We'll call to confirm your exact slot.`
+  );
+}
+
 async function routeInteractive(from, id, session) {
   if (id === "menu_book") {
     await sendLocationChoice(from);
@@ -151,8 +165,9 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "confirm_yes") {
+    const bookingId = await getNextBookingId();
     const booking = {
-      id: nanoid(8),
+      id: bookingId,
       phone: from,
       ...session.draft,
       status: "pending_confirmation_call",
@@ -206,8 +221,15 @@ async function routeFreeText(from, text, session) {
         await sendText(from, `Number of passengers must be a number. Please resend, e.g. "2, 25 Sept"`);
         return;
       }
+      const dateText = parts.slice(1).join(", ");
+      const parsedDate = chrono.parseDate(dateText, new Date(), { forwardDate: true });
+      if (!parsedDate) {
+        await sendText(from, `Couldn't understand that date. Please try again, e.g. "2, 25 Sept"`);
+        return;
+      }
+      const isoDate = parsedDate.toISOString().split("T")[0];
       session.draft.passengerCount = count;
-      session.draft.date = parts.slice(1).join(", ");
+      session.draft.date = isoDate;
       await saveSession(from, session);
       await sendButtons(from, "Preferred time of day?", [
         { id: "time_morning", title: "🌅 Morning" },
@@ -216,41 +238,12 @@ async function routeFreeText(from, text, session) {
       return;
     }
 
-    case "ASK_EMAIL": {
-      if (!text.includes("@")) {
-        await sendText(from, "That doesn't look like a valid email — please re-enter it.");
-        return;
-      }
-      session.draft.email = text;
-      session.step = "CONFIRM";
-      await saveSession(from, session);
-      const d = session.draft;
-      const paxSummary = d.passengerList
-        .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
-        .join("\n");
-      await sendButtons(
-        from,
-        `Please confirm your booking:\n\n` +
-          `📍 ${d.location} — ${d.package}\n` +
-          `💰 ${d.price}\n` +
-          `👥 Passengers (${d.passengerCount}):\n${paxSummary}\n` +
-          `📅 Date: ${d.date} (${d.timePreference})\n` +
-          `📧 ${d.email}\n\n` +
-          `We'll call to confirm your exact slot.`,
-        [
-          { id: "confirm_yes", title: "✅ Confirm" },
-          { id: "confirm_no", title: "❌ Cancel" },
-        ]
-      );
-      return;
-    }
-
     default:
       await sendWelcome(from);
   }
 }
 
-export async function handleBulkFormSubmission({ phone, passengers }) {
+export async function handleBulkFormSubmission({ phone, passengers, email }) {
   const session = getSession(phone);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
 
@@ -264,9 +257,13 @@ export async function handleBulkFormSubmission({ phone, passengers }) {
     session.draft.passengerList.push({ name: p.name, age: p.age, weight: w });
   }
 
-  session.step = "ASK_EMAIL";
+  session.draft.email = email;
+  session.step = "CONFIRM";
   await saveSession(phone, session);
-  await sendText(phone, "What's the best email address for your booking confirmation?");
+  await sendButtons(phone, buildConfirmMessage(session.draft), [
+    { id: "confirm_yes", title: "✅ Confirm" },
+    { id: "confirm_no", title: "❌ Cancel" },
+  ]);
 }
 
 async function handOffToHuman(to) {
