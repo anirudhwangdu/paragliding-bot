@@ -4,7 +4,6 @@ let sheetsClient = null;
 
 function getClient() {
   if (sheetsClient) return sheetsClient;
-
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -12,7 +11,6 @@ function getClient() {
     },
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
-
   sheetsClient = google.sheets({ version: "v4", auth });
   return sheetsClient;
 }
@@ -56,6 +54,13 @@ export async function getNextBookingId() {
     range: "Sheet1!A:A",
   });
   const rows = res.data.values || [];
-  const nextNum = rows.length; // header row = 1, so first booking becomes 1
-  return "SKY" + String(nextNum).padStart(4, "0");
+  let maxNum = 0;
+  for (const row of rows) {
+    const match = /^SKY(\d+)$/.exec(row[0] || "");
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return "SKY" + String(maxNum + 1).padStart(4, "0");
 }

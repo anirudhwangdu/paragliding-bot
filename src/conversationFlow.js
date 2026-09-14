@@ -243,7 +243,22 @@ async function routeFreeText(from, text, session) {
   }
 }
 
-export async function handleBulkFormSubmission({ phone, passengers, email }) {
+function buildConfirmMessage(d) {
+  const paxSummary = d.passengerList
+    .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
+    .join("\n");
+  return (
+    `Please confirm your booking:\n\n` +
+    `📍 ${d.location} — ${d.package}\n` +
+    `💰 ${d.price}\n` +
+    `👥 Passengers (${d.passengerCount}):\n${paxSummary}\n` +
+    `📅 Date: ${d.date} (${d.timePreference})\n` +
+    `📧 ${d.email}\n\n` +
+    `We'll call to confirm your exact slot.`
+  );
+}
+
+export async function handleBulkFormSubmission({ phone, passengers }) {
   const session = getSession(phone);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
 
@@ -254,15 +269,29 @@ export async function handleBulkFormSubmission({ phone, passengers, email }) {
       await resetSession(phone);
       return;
     }
-    session.draft.passengerList.push({ name: p.name, age: p.age, weight: w });
+    session.draft.passengerList.push({ name: p.name, age: p.age, weight: w, email: p.email });
   }
 
-  session.draft.email = email;
-  session.step = "CONFIRM";
+  if (session.draft.passengerList.length === 1) {
+    session.draft.email = session.draft.passengerList[0].email;
+    session.step = "CONFIRM";
+    await saveSession(phone, session);
+    await sendButtons(phone, buildConfirmMessage(session.draft), [
+      { id: "confirm_yes", title: "✅ Confirm" },
+      { id: "confirm_no", title: "❌ Cancel" },
+    ]);
+    return;
+  }
+
+  session.step = "CHOOSE_CONFIRM_EMAIL";
   await saveSession(phone, session);
-  await sendButtons(phone, buildConfirmMessage(session.draft), [
-    { id: "confirm_yes", title: "✅ Confirm" },
-    { id: "confirm_no", title: "❌ Cancel" },
+  const rows = session.draft.passengerList.map((p, i) => ({
+    id: `email_${i}`,
+    title: `Passenger ${i + 1}`,
+    description: p.email,
+  }));
+  await sendList(phone, "Which email should we send the booking confirmation to?", "Choose Email", [
+    { title: "Confirmation Email", rows },
   ]);
 }
 
