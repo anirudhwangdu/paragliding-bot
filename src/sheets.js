@@ -34,11 +34,12 @@ export async function appendBookingToSheet(booking) {
       p.age,
       p.weight,
       p.email,
+      booking.customerRef,
     ]);
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Sheet1!A:O",
+      range: "Sheet1!A:P",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: rows },
     });

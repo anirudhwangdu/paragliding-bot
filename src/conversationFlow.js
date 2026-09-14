@@ -4,6 +4,7 @@ import { LOCATIONS, findPackage } from "./packages.js";
 import { sendText, sendButtons, sendList, sendVideo } from "./whatsappClient.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import * as chrono from "chrono-node";
+import { nanoid } from "nanoid";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -164,10 +165,24 @@ async function routeInteractive(from, id, session) {
     return;
   }
 
-  if (id === "confirm_yes") {
+  if (id.startsWith("email_")) {
+    const idx = parseInt(id.replace("email_", ""), 10);
+    session.draft.email = session.draft.passengerList[idx].email;
+    session.step = "CONFIRM";
+    await saveSession(from, session);
+    await sendButtons(from, buildConfirmMessage(session.draft), [
+      { id: "confirm_yes", title: "✅ Confirm" },
+      { id: "confirm_no", title: "❌ Cancel" },
+    ]);
+    return;
+  }
+  
+    if (id === "confirm_yes") {
     const bookingId = await getNextBookingId();
+    const customerRef = "SKY-" + nanoid(6).toUpperCase();
     const booking = {
       id: bookingId,
+      customerRef,
       phone: from,
       ...session.draft,
       status: "pending_confirmation_call",
@@ -178,16 +193,16 @@ async function routeInteractive(from, id, session) {
     const paxSummary = booking.passengerList
       .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
       .join("\n");
-    await sendText(
+        await sendText(
       from,
-      `✅ Booking received! Reference: *${booking.id}*\n\n` +
+      `✅ Booking received! Reference: *${booking.customerRef}*\n\n` +
         `${booking.location} — ${booking.package}\n` +
         `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
         `Date: ${booking.date} · ${booking.timePreference}\n\n` +
         `Our team will call you shortly to confirm your exact time slot. ` +
         `A confirmation has also been noted against your email: ${booking.email}.`
     );
-    if (process.env.HUMAN_HANDOFF_NUMBER) {
+        if (process.env.HUMAN_HANDOFF_NUMBER) {
       await sendText(
         process.env.HUMAN_HANDOFF_NUMBER,
         `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
