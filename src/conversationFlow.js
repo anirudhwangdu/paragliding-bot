@@ -258,21 +258,6 @@ async function routeFreeText(from, text, session) {
   }
 }
 
-function buildConfirmMessage(d) {
-  const paxSummary = d.passengerList
-    .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
-    .join("\n");
-  return (
-    `Please confirm your booking:\n\n` +
-    `📍 ${d.location} — ${d.package}\n` +
-    `💰 ${d.price}\n` +
-    `👥 Passengers (${d.passengerCount}):\n${paxSummary}\n` +
-    `📅 Date: ${d.date} (${d.timePreference})\n` +
-    `📧 ${d.email}\n\n` +
-    `We'll call to confirm your exact slot.`
-  );
-}
-
 export async function handleBulkFormSubmission({ phone, passengers }) {
   const session = getSession(phone);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
