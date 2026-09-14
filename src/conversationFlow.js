@@ -17,9 +17,14 @@ export async function handleIncomingMessage(from, message) {
     return;
   }
 
-  if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
+   if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
     await resetSession(from);
     await sendWelcome(from);
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      sendText(process.env.HUMAN_HANDOFF_NUMBER, `💬 New chat started by ${from}`).catch((e) =>
+        console.error("Lead notification failed:", e.message)
+      );
+    }
     return;
   }
 
