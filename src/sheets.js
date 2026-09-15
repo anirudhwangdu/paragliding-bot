@@ -18,7 +18,7 @@ function getClient() {
 export async function appendBookingToSheet(booking) {
   try {
     const sheets = getClient();
-    const rows = booking.passengerList.map((p, i) => [
+     const rows = booking.passengerList.map((p, i) => [
       booking.id,
       booking.phone,
       booking.location,
@@ -35,11 +35,14 @@ export async function appendBookingToSheet(booking) {
       p.weight,
       p.email,
       booking.customerRef,
+      booking.advance,
+      booking.balance,
+      "", // Confirmation Status - blank until staff approves
     ]);
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Sheet1!A:P",
+      range: "Sheet1!A:S",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: rows },
     });
