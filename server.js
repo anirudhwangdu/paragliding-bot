@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
+import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
+import { sendTemplate } from "./src/whatsappClient.js";
 
 dotenv.config();
 

@@ -68,3 +68,38 @@ export async function getNextBookingId() {
   }
   return "SKY" + String(maxNum + 1).padStart(4, "0");
 }
+
+export async function getBookingsNeedingReminder() {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A2:T",
+  });
+  const rows = res.data.values || [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+  const seen = new Set();
+  const results = [];
+  rows.forEach((row, idx) => {
+    const bookingId = row[0], phone = row[1], location = row[2], pkg = row[3],
+          paxCount = row[5], date = row[6], timePref = row[7], name = row[11],
+          reminderSent = row[19];
+    if (date === tomorrowStr && reminderSent !== "yes" && !seen.has(bookingId)) {
+      seen.add(bookingId);
+      results.push({ rowIndex: idx + 2, bookingId, phone, location, package: pkg, paxCount, date, timePref, name });
+    }
+  });
+  return results;
+}
+
+export async function markReminderSent(rowIndex) {
+  const sheets = getClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `Sheet1!T${rowIndex}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [["yes"]] },
+  });
+}

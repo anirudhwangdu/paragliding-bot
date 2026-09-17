@@ -21,6 +21,15 @@ export async function sendText(to, body) {
   });
 }
 
+export async function sendTemplate(to, templateName, languageCode, components) {
+  return client().post("/messages", {
+    messaging_product: "whatsapp",
+    to,
+    type: "template",
+    template: { name: templateName, language: { code: languageCode }, components },
+  });
+}
+
 export async function sendVideo(to, videoUrl, caption) {
   return client().post("/messages", {
     messaging_product: "whatsapp",
