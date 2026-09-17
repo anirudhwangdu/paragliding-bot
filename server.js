@@ -1,16 +1,37 @@
 import express from "express";
 import dotenv from "dotenv";
+import cron from "node-cron";
+import axios from "axios";
+
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
 import { sendTemplate } from "./src/whatsappClient.js";
 
+// Initialize environment variables
 dotenv.config();
 
 const app = express();
 app.use(express.json());
 
+const PORT = process.env.PORT || 3000;
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
+// 1. Health Check Endpoint
+app.get("/health", (req, res) => res.status(200).send("OK"));
+
+// 2. Keep-Alive Cron Schedule (Every 10 minutes)
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    await axios.get(`${RENDER_URL}/health`);
+    console.log("[Keep-Alive] Ping sent successfully");
+  } catch (err) {
+    console.error("[Keep-Alive] Ping failed:", err.message);
+  }
+});
+
+// Webhook Verification
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -23,6 +44,7 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
+// Incoming Webhook Messages
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 
@@ -46,12 +68,14 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// Bookings & Admin Endpoints
 app.get("/bookings", (req, res) => {
   res.json(listBookings());
 });
 
 app.get("/", (req, res) => res.send("Paragliding WhatsApp bot is running."));
 
+// Passenger Form Endpoints
 app.get("/passenger-form", (req, res) => {
   const to = req.query.to || "";
   const total = req.query.total || "1";
@@ -145,5 +169,48 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
 </html>`;
 }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+// Scheduled Background Task for Flight Reminders
+async function processReminders() {
+  try {
+    const bookings = await getBookingsNeedingReminder();
+    for (const b of bookings) {
+      await sendTemplate(b.phone, "flight_reminder", "en_US", [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: b.name },
+            { type: "text", text: b.package },
+            { type: "text", text: b.date },
+            { type: "text", text: b.timePref },
+          ],
+        },
+      ]);
+      if (process.env.HUMAN_HANDOFF_NUMBER) {
+        await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "staff_flight_alert", "en_US", [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: b.package },
+              { type: "text", text: String(b.paxCount) },
+              { type: "text", text: b.date },
+              { type: "text", text: b.timePref },
+              { type: "text", text: `${b.name}, ${b.phone}` },
+            ],
+          },
+        ]);
+      }
+      await markReminderSent(b.rowIndex);
+    }
+  } catch (err) {
+    console.error("Reminder processing failed:", err.message);
+  }
+}
+
+// Run reminder service every hour
+setInterval(processReminders, 60 * 60 * 1000);
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+  processReminders(); // Run once on startup
+});
