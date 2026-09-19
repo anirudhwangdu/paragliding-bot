@@ -2,13 +2,12 @@ import express from "express";
 import dotenv from "dotenv";
 import cron from "node-cron";
 import axios from "axios";
-import { sendTemplate } from "./src/whatsappClient.js";
+import { sendTemplate,markRead } from "./src/whatsappClient.js";
 import { sendConfirmationEmail } from "./src/email.js";
-import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
-import { sendTemplate } from "./src/whatsappClient.js";
+
 
 // Initialize environment variables
 dotenv.config();
