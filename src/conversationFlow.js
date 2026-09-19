@@ -315,7 +315,7 @@ async function handOffToHuman(to) {
       "For urgent safety issues, please call us directly."
   );
   if (process.env.HUMAN_HANDOFF_NUMBER) {
-    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en_US", [
+    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
       { type: "body", parameters: [{ type: "text", text: to }] },
     ]).catch((e) => console.error("Handoff template failed:", e.message));
   }

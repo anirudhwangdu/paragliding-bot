@@ -174,7 +174,7 @@ async function processReminders() {
   try {
     const bookings = await getBookingsNeedingReminder();
     for (const b of bookings) {
-      await sendTemplate(b.phone, "flight_reminder", "en_US", [
+      await sendTemplate(b.phone, "flight_reminder", "en", [
         {
           type: "body",
           parameters: [
@@ -186,7 +186,7 @@ async function processReminders() {
         },
       ]);
       if (process.env.HUMAN_HANDOFF_NUMBER) {
-        await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "staff_flight_alert", "en_US", [
+        await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "staff_flight_alert", "en", [
           {
             type: "body",
             parameters: [
@@ -214,7 +214,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       ? "booking_confirmed_bangalore"
       : "booking_confirmed_alleppey";
 
-    await sendTemplate(phone, templateName, "en_US", [
+    await sendTemplate(phone, templateName, "en", [
       {
         type: "body",
         parameters: [
