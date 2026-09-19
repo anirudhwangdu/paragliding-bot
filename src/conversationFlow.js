@@ -1,10 +1,10 @@
 import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
-import { sendText, sendButtons, sendList, sendVideo } from "./whatsappClient.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import * as chrono from "chrono-node";
 import { nanoid } from "nanoid";
+import { sendText, sendButtons, sendList, sendVideo, sendTemplate } from "./whatsappClient.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -185,10 +185,18 @@ async function routeInteractive(from, id, session) {
     if (id === "confirm_yes") {
     const bookingId = await getNextBookingId();
     const customerRef = "SKY-" + nanoid(6).toUpperCase();
-    const booking = {
+        const chosenPkg = findPackage(session.draft.selectedPackageId);
+    const totalPrice = chosenPkg.unit === "person"
+      ? chosenPkg.priceValue * session.draft.passengerCount
+      : chosenPkg.priceValue;
+    const advance = 1000 * session.draft.passengerCount;
+    const balance = totalPrice - advance;
+        const booking = {
       id: bookingId,
       customerRef,
       phone: from,
+      advance,
+      balance,
       ...session.draft,
       status: "pending_confirmation_call",
       createdAt: new Date().toISOString(),
@@ -307,7 +315,9 @@ async function handOffToHuman(to) {
       "For urgent safety issues, please call us directly."
   );
   if (process.env.HUMAN_HANDOFF_NUMBER) {
-    await sendText(process.env.HUMAN_HANDOFF_NUMBER, `⚠️ Handoff requested by ${to}. Please check the chat directly.`);
+    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en_US", [
+      { type: "body", parameters: [{ type: "text", text: to }] },
+    ]).catch((e) => console.error("Handoff template failed:", e.message));
   }
 }
 
