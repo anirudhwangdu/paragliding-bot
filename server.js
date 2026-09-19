@@ -2,7 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cron from "node-cron";
 import axios from "axios";
-
+import { sendTemplate } from "./src/whatsappClient.js";
+import { sendConfirmationEmail } from "./src/email.js";
 import { markRead } from "./src/whatsappClient.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
@@ -201,10 +202,52 @@ async function processReminders() {
       }
       await markReminderSent(b.rowIndex);
     }
-  } catch (err) {
-    console.error("Reminder processing failed:", err.message);
+   } catch (err) {
+    console.error("Reminder processing failed:", err.response?.data || err.message, err.config?.url || "");
   }
 }
+
+app.post("/booking-confirmed", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { location, phone, email, name, weight, date, package: pkg, passengerCount, advance, balance } = req.body;
+    const templateName = location.toLowerCase().includes("bangalore")
+      ? "booking_confirmed_bangalore"
+      : "booking_confirmed_alleppey";
+
+    await sendTemplate(phone, templateName, "en_US", [
+      {
+        type: "body",
+        parameters: [
+          { type: "text", text: name },
+          { type: "text", text: String(weight) },
+          { type: "text", text: date },
+          { type: "text", text: pkg },
+          { type: "text", text: String(passengerCount) },
+          { type: "text", text: String(advance) },
+          { type: "text", text: String(balance) },
+        ],
+      },
+    ]);
+
+    if (email) {
+      await sendConfirmationEmail(
+        email,
+        "Your Sky Sail Adventures Booking is Confirmed! ✅",
+        `<h2>Booking Confirmed</h2>
+         <p><b>Name:</b> ${name}</p>
+         <p><b>Package:</b> ${pkg}</p>
+         <p><b>Date:</b> ${date}</p>
+         <p><b>Passengers:</b> ${passengerCount}</p>
+         <p><b>Advance paid:</b> ₹${advance}</p>
+         <p><b>Balance due:</b> ₹${balance}</p>
+         <p>See you in the sky! ✈️</p>`
+      );
+    }
+  } catch (err) {
+    console.error("Booking confirmation failed:", err.response?.data || err.message);
+  }
+});
 
 // Run reminder service every hour
 setInterval(processReminders, 60 * 60 * 1000);
