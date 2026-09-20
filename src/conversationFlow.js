@@ -146,20 +146,24 @@ async function routeInteractive(from, id, session) {
 
   if (id === "pkg_book") {
     const chosen = findPackage(session.draft.selectedPackageId);
+    if (!chosen) {
+      await sendText(from, "That package is no longer available. Let's start over.");
+      await resetSession(from);
+      await sendMainMenu(from);
+      return;
+    }
     session.draft.package = chosen.title;
     session.draft.price = chosen.description;
-    session.step = "ASK_PASSENGERS_DATE";
-    await saveSession(from, session);
-    await sendText(from, `How many passengers, and what date would you like to fly?\ne.g. "2, 25 Sept"`);
-    return;
-  }
 
-  if (id === "pkg_other") {
-    session.step = "CHOOSE_PACKAGE";
-    await saveSession(from, session);
-    await sendPackageList(from, session.draft.locationKey);
+async function sendPackageList(to, locationKey) {
+  const loc = LOCATIONS[locationKey];
+  if (!loc) {
+    await sendText(to, "Something went wrong loading packages. Let's start over.");
+    await resetSession(to);
+    await sendMainMenu(to);
     return;
   }
+  const cleanSections = loc.sections.map((section) => ({
 
   if (id === "time_morning" || id === "time_evening") {
     session.draft.timePreference = id === "time_morning" ? "Morning" : "Evening";
