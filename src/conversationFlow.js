@@ -17,13 +17,13 @@ export async function handleIncomingMessage(from, message) {
     return;
   }
 
-   if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
+  if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
     await resetSession(from);
     await sendWelcome(from);
     if (process.env.HUMAN_HANDOFF_NUMBER) {
-      sendText(process.env.HUMAN_HANDOFF_NUMBER, `💬 New chat started by ${from}`).catch((e) =>
-        console.error("Lead notification failed:", e.message)
-      );
+      sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
+        { type: "body", parameters: [{ type: "text", text: from }] },
+      ]).catch((e) => console.error("Lead notification failed:", e.message));
     }
     return;
   }
@@ -70,6 +70,12 @@ async function sendLocationChoice(to) {
 
 async function sendPackageList(to, locationKey) {
   const loc = LOCATIONS[locationKey];
+  if (!loc) {
+    await sendText(to, "Something went wrong loading packages. Let's start over.");
+    await resetSession(to);
+    await sendMainMenu(to);
+    return;
+  }
   const cleanSections = loc.sections.map((section) => ({
     title: section.title,
     rows: section.rows.map(({ id, title, description }) => ({ id, title, description })),
@@ -154,16 +160,18 @@ async function routeInteractive(from, id, session) {
     }
     session.draft.package = chosen.title;
     session.draft.price = chosen.description;
-
-async function sendPackageList(to, locationKey) {
-  const loc = LOCATIONS[locationKey];
-  if (!loc) {
-    await sendText(to, "Something went wrong loading packages. Let's start over.");
-    await resetSession(to);
-    await sendMainMenu(to);
+    session.step = "ASK_PASSENGERS_DATE";
+    await saveSession(from, session);
+    await sendText(from, `How many passengers, and what date would you like to fly?\ne.g. "2, 25 Sept"`);
     return;
   }
-  const cleanSections = loc.sections.map((section) => ({
+
+  if (id === "pkg_other") {
+    session.step = "CHOOSE_PACKAGE";
+    await saveSession(from, session);
+    await sendPackageList(from, session.draft.locationKey);
+    return;
+  }
 
   if (id === "time_morning" || id === "time_evening") {
     session.draft.timePreference = id === "time_morning" ? "Morning" : "Evening";
@@ -185,17 +193,23 @@ async function sendPackageList(to, locationKey) {
     ]);
     return;
   }
-  
-    if (id === "confirm_yes") {
+
+  if (id === "confirm_yes") {
     const bookingId = await getNextBookingId();
     const customerRef = "SKY-" + nanoid(6).toUpperCase();
-        const chosenPkg = findPackage(session.draft.selectedPackageId);
+    const chosenPkg = findPackage(session.draft.selectedPackageId);
+    if (!chosenPkg) {
+      await sendText(from, "Something went wrong with your package selection. Let's start over.");
+      await resetSession(from);
+      await sendMainMenu(from);
+      return;
+    }
     const totalPrice = chosenPkg.unit === "person"
       ? chosenPkg.priceValue * session.draft.passengerCount
       : chosenPkg.priceValue;
     const advance = 1000 * session.draft.passengerCount;
     const balance = totalPrice - advance;
-        const booking = {
+    const booking = {
       id: bookingId,
       customerRef,
       phone: from,
@@ -210,7 +224,7 @@ async function sendPackageList(to, locationKey) {
     const paxSummary = booking.passengerList
       .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
       .join("\n");
-        await sendText(
+    await sendText(
       from,
       `✅ Booking received! Reference: *${booking.customerRef}*\n\n` +
         `${booking.location} — ${booking.package}\n` +
@@ -219,7 +233,7 @@ async function sendPackageList(to, locationKey) {
         `Our team will call you shortly to confirm your exact time slot. ` +
         `A confirmation has also been noted against your email: ${booking.email}.`
     );
-        if (process.env.HUMAN_HANDOFF_NUMBER) {
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
       await sendText(
         process.env.HUMAN_HANDOFF_NUMBER,
         `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
