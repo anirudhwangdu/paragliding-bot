@@ -225,6 +225,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
           { type: "text", text: String(passengerCount) },
           { type: "text", text: String(advance) },
           { type: "text", text: String(balance) },
+          { type: "text", text: "89517 71232" },
         ],
       },
     ]);
@@ -233,13 +234,16 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       await sendConfirmationEmail(
         email,
         "Your Sky Sail Adventures Booking is Confirmed! ✅",
-        `<h2>Booking Confirmed</h2>
+        `<h2>🪂 Sky Sail Adventures - Booking Confirmed ✅</h2>
          <p><b>Name:</b> ${name}</p>
-         <p><b>Package:</b> ${pkg}</p>
+         <p><b>Weight:</b> ${weight} kg</p>
          <p><b>Date:</b> ${date}</p>
+         <p><b>Package:</b> ${pkg}</p>
          <p><b>Passengers:</b> ${passengerCount}</p>
          <p><b>Advance paid:</b> ₹${advance}</p>
          <p><b>Balance due:</b> ₹${balance}</p>
+         <p><b>Contact:</b> 89517 71232</p>
+         <p>Please arrive 15-20 mins early. Flights are weather-dependent. Carry this confirmation.</p>
          <p>See you in the sky! ✈️</p>`
       );
     }
