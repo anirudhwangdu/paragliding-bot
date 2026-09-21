@@ -29,3 +29,7 @@ export async function saveBooking(booking) {
 export function listBookings() {
   return db.data.bookings;
 }
+
+export function hasSession(phone) {
+  return !!db.data.sessions[phone];
+}

@@ -1,4 +1,4 @@
-import { getSession, saveSession, resetSession, saveBooking } from "./db.js";
+import { getSession, saveSession, resetSession, saveBooking, hasSession } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
@@ -17,18 +17,21 @@ export async function handleIncomingMessage(from, message) {
     return;
   }
 
+  const isNewSession = !hasSession(from);
+  const session = getSession(from);
+
+  if (isNewSession && process.env.HUMAN_HANDOFF_NUMBER) {
+    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
+      { type: "body", parameters: [{ type: "text", text: from }] },
+    ]).catch((e) => console.error("New chat notification failed:", e.message));
+  }
+
   if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
     await resetSession(from);
     await sendWelcome(from);
-    if (process.env.HUMAN_HANDOFF_NUMBER) {
-      sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
-        { type: "body", parameters: [{ type: "text", text: from }] },
-      ]).catch((e) => console.error("Lead notification failed:", e.message));
-    }
     return;
   }
 
-  const session = getSession(from);
   const interactiveId = extractInteractiveId(message);
 
   if (interactiveId) {
@@ -285,6 +288,7 @@ async function routeFreeText(from, text, session) {
     }
 
     default:
+      await sendText(from, "Oops, we didn't quite get that 🙏");
       await sendWelcome(from);
   }
 }
