@@ -366,21 +366,13 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       ? "booking_confirmed_bangalore"
       : "booking_confirmed_allepey";
 
-    // Convert customer's selected date (YYYY-MM-DD)
-    // into a Unix timestamp for WhatsApp DATE_TIME header.
+    // Convert customer's selected date: YYYY-MM-DD
     const [year, month, day] = date.split("-").map(Number);
 
-    // Use noon IST so the displayed date doesn't shift backward/forward.
-    const selectedDate = new Date(
-      year,
-      month - 1,
-      day,
-      12,
-      0,
-      0
-    );
-
-    const timestamp = Math.floor(selectedDate.getTime() / 1000);
+    // Day of week:
+    // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+    const selectedDate = new Date(year, month - 1, day);
+    const dayOfWeek = selectedDate.getDay();
 
     await sendTemplate(phone, templateName, "en", [
       {
@@ -389,8 +381,14 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
           {
             type: "date_time",
             date_time: {
-              timestamp: String(timestamp),
-              fallback_value: date
+              fallback_value: `${day}/${month}/${year}`,
+              day_of_week: dayOfWeek,
+              year: year,
+              month: month,
+              day_of_month: day,
+              hour: 0,
+              minute: 0,
+              calendar: "GREGORIAN"
             }
           }
         ]
