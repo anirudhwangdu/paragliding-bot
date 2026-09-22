@@ -212,7 +212,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
     const { location, phone, email, name, weight, date, package: pkg, passengerCount, advance, balance } = req.body;
     const templateName = location.toLowerCase().includes("bangalore")
       ? "booking_confirmed_bangalore"
-      : "booking_confirmed_alleppey";
+      : "booking_confirmed_allepey";
 
     await sendTemplate(phone, templateName, "en", [
       {
