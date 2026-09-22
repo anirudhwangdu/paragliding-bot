@@ -37,7 +37,7 @@ export async function appendBookingToSheet(booking) {
       booking.customerRef,
       booking.advance,
       booking.balance,
-      "", // Confirmation Status - blank until staff approves
+      "pendingg", // Confirmation Status - blank until staff approves
     ]);
 
     await sheets.spreadsheets.values.append({
