@@ -347,13 +347,54 @@ async function processReminders() {
 
 app.post("/booking-confirmed", express.json(), async (req, res) => {
   res.sendStatus(200);
+
   try {
-    const { location, phone, email, name, weight, date, package: pkg, passengerCount, advance, balance } = req.body;
+    const {
+      location,
+      phone,
+      email,
+      name,
+      weight,
+      date,
+      package: pkg,
+      passengerCount,
+      advance,
+      balance
+    } = req.body;
+
     const templateName = location.toLowerCase().includes("bangalore")
       ? "booking_confirmed_bangalore"
       : "booking_confirmed_allepey";
 
+    // Convert customer's selected date (YYYY-MM-DD)
+    // into a Unix timestamp for WhatsApp DATE_TIME header.
+    const [year, month, day] = date.split("-").map(Number);
+
+    // Use noon IST so the displayed date doesn't shift backward/forward.
+    const selectedDate = new Date(
+      year,
+      month - 1,
+      day,
+      12,
+      0,
+      0
+    );
+
+    const timestamp = Math.floor(selectedDate.getTime() / 1000);
+
     await sendTemplate(phone, templateName, "en", [
+      {
+        type: "header",
+        parameters: [
+          {
+            type: "date_time",
+            date_time: {
+              timestamp: String(timestamp),
+              fallback_value: date
+            }
+          }
+        ]
+      },
       {
         type: "body",
         parameters: [
@@ -364,9 +405,9 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
           { type: "text", text: String(passengerCount) },
           { type: "text", text: String(advance) },
           { type: "text", text: String(balance) },
-          { type: "text", text: "89517 71232" },
-        ],
-      },
+          { type: "text", text: "89517 71232" }
+        ]
+      }
     ]);
 
     if (email) {
@@ -386,8 +427,12 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
          <p>See you in the sky! ✈️</p>`
       );
     }
+
   } catch (err) {
-    console.error("Booking confirmation failed:", err.response?.data || err.message);
+    console.error(
+      "Booking confirmation failed:",
+      err.response?.data || err.message
+    );
   }
 });
 
