@@ -105,6 +105,7 @@ h2{color:#1a3c6e;}
 input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
 button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
 button:disabled{opacity:0.6;}
+#dateField{display:block;}
 #thankyou{display:none;text-align:center;}
 </style>
 </head>
@@ -112,6 +113,9 @@ button:disabled{opacity:0.6;}
 <div id="formWrap">
 <h2 id="heading">Passenger 1 of ${total}</h2>
 <form id="paxForm">
+  <div id="dateField">
+    <input type="date" id="flightDate" required>
+  </div>
   <input type="text" id="name" placeholder="Full Name" required>
   <input type="number" id="age" placeholder="Age" required>
   <input type="number" id="weight" placeholder="Weight (kg)" required>
@@ -129,12 +133,17 @@ const total = ${total};
 let current = 1;
 let isSubmitting = false;
 const passengers = [];
+let flightDate = '';
 
 document.getElementById('paxForm').addEventListener('submit', async function(e){
   e.preventDefault();
   if (isSubmitting) return;
   isSubmitting = true;
   document.getElementById('submitBtn').disabled = true;
+
+  if (current === 1) {
+    flightDate = document.getElementById('flightDate').value;
+  }
 
   const name = document.getElementById('name').value;
   const age = document.getElementById('age').value;
@@ -145,6 +154,7 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
   if (current < total) {
     current++;
     document.getElementById('heading').textContent = 'Passenger ' + current + ' of ' + total;
+    document.getElementById('dateField').style.display = 'none';
     document.getElementById('name').value = '';
     document.getElementById('age').value = '';
     document.getElementById('weight').value = '';
@@ -158,7 +168,7 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
   await fetch('/passenger-form-submit', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ phone: "${to}", passengers })
+    body: JSON.stringify({ phone: "${to}", passengers, date: flightDate })
   });
   document.getElementById('formWrap').style.display = 'none';
   document.getElementById('thankyou').style.display = 'block';

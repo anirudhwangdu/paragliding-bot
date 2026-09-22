@@ -77,3 +77,12 @@ export async function markRead(messageId) {
     message_id: messageId,
   });
 }
+
+export async function sendImage(to, imageUrl, caption) {
+  return client().post("/messages", {
+    messaging_product: "whatsapp",
+    to,
+    type: "image",
+    image: { link: imageUrl, caption: caption || "" },
+  });
+}

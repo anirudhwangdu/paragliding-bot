@@ -2,9 +2,8 @@ import { getSession, saveSession, resetSession, saveBooking, hasSession } from "
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
-import * as chrono from "chrono-node";
 import { nanoid } from "nanoid";
-import { sendText, sendButtons, sendList, sendVideo, sendTemplate } from "./whatsappClient.js";
+import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendTemplate } from "./whatsappClient.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -20,15 +19,13 @@ export async function handleIncomingMessage(from, message) {
   const isNewSession = !hasSession(from);
   const session = getSession(from);
 
-  if (isNewSession && process.env.HUMAN_HANDOFF_NUMBER) {
-    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "new_chat_alert", "en", [
-      { type: "body", parameters: [{ type: "text", text: from }] },
-    ]).catch((e) => console.error("New chat notification failed:", e.message));
-  }
-
-  if (["hi", "hello", "hey", "menu", "start"].includes(lower)) {
-    await resetSession(from);
-    await sendWelcome(from);
+  if (isNewSession && (["hi", "hello", "hey", "menu", "start"].includes(lower) || !session.step)) {
+    session.step = "AWAITING_INITIAL_LOCATION";
+    await saveSession(from, session);
+    await sendButtons(from, "👋 Welcome! Which location are you interested in?", [
+      { id: "greet_bangalore", title: "Bangalore" },
+      { id: "greet_alleppey", title: "Alleppey" },
+    ]);
     return;
   }
 
@@ -43,7 +40,9 @@ export async function handleIncomingMessage(from, message) {
 }
 
 async function sendWelcome(to) {
-  if (process.env.WELCOME_VIDEO_URL) {
+  if (process.env.WELCOME_VIDEO_ID) {
+    await sendVideoById(to, process.env.WELCOME_VIDEO_ID, "See what flying with us feels like! 🪂");
+  } else if (process.env.WELCOME_VIDEO_URL) {
     await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
   }
   await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
@@ -61,13 +60,6 @@ async function sendMainMenu(to) {
         { id: "menu_website", title: "Visit our Website", description: "skysailadventures.com" },
       ],
     },
-  ]);
-}
-
-async function sendLocationChoice(to) {
-  await sendButtons(to, "Which location would you like to fly at?", [
-    { id: "loc_bangalore", title: "Bangalore" },
-    { id: "loc_alleppey", title: "Alleppey" },
   ]);
 }
 
@@ -108,8 +100,33 @@ function buildConfirmMessage(d) {
 }
 
 async function routeInteractive(from, id, session) {
+  if (id === "greet_bangalore" || id === "greet_alleppey") {
+    const key = id === "greet_bangalore" ? "bangalore" : "alleppey";
+    session.draft = { location: LOCATIONS[key].label, locationKey: key };
+    session.step = "IDLE";
+    await saveSession(from, session);
+
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "new_chat_alert", "en", [
+        { type: "body", parameters: [{ type: "text", text: `${from} (${LOCATIONS[key].label})` }] },
+      ]).catch((e) => console.error("New chat notification failed:", e.message));
+    }
+
+    await sendWelcome(from);
+    return;
+  }
+
   if (id === "menu_book") {
-    await sendLocationChoice(from);
+    if (session.draft?.locationKey) {
+      session.step = "CHOOSE_PACKAGE";
+      await saveSession(from, session);
+      await sendPackageList(from, session.draft.locationKey);
+    } else {
+      await sendButtons(from, "Which location would you like to fly at?", [
+        { id: "greet_bangalore", title: "Bangalore" },
+        { id: "greet_alleppey", title: "Alleppey" },
+      ]);
+    }
     return;
   }
   if (id === "menu_faq") {
@@ -122,15 +139,6 @@ async function routeInteractive(from, id, session) {
   }
   if (id === "menu_website") {
     await sendText(from, "🌐 Visit us at: https://www.skysailadventures.com");
-    return;
-  }
-
-  if (id === "loc_bangalore" || id === "loc_alleppey") {
-    const key = id === "loc_bangalore" ? "bangalore" : "alleppey";
-    session.draft = { location: LOCATIONS[key].label, locationKey: key };
-    session.step = "CHOOSE_PACKAGE";
-    await saveSession(from, session);
-    await sendPackageList(from, key);
     return;
   }
 
@@ -163,9 +171,9 @@ async function routeInteractive(from, id, session) {
     }
     session.draft.package = chosen.title;
     session.draft.price = chosen.description;
-    session.step = "ASK_PASSENGERS_DATE";
+    session.step = "ASK_PASSENGERS";
     await saveSession(from, session);
-    await sendText(from, `How many passengers, and what date would you like to fly?\ne.g. "2, 25 Sept"`);
+    await sendText(from, `How many passengers will be flying?`);
     return;
   }
 
@@ -233,9 +241,12 @@ async function routeInteractive(from, id, session) {
         `${booking.location} — ${booking.package}\n` +
         `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
         `Date: ${booking.date} · ${booking.timePreference}\n\n` +
-        `Our team will call you shortly to confirm your exact time slot. ` +
-        `A confirmation has also been noted against your email: ${booking.email}.`
+        `Please pay the advance of ₹${advance} using the QR code below. ` +
+        `Once received, we'll confirm your slot.`
     );
+    if (process.env.QR_IMAGE_URL) {
+      await sendImage(from, process.env.QR_IMAGE_URL, `Advance payment: ₹${advance}`);
+    }
     if (process.env.HUMAN_HANDOFF_NUMBER) {
       await sendText(
         process.env.HUMAN_HANDOFF_NUMBER,
@@ -259,26 +270,13 @@ async function routeInteractive(from, id, session) {
 
 async function routeFreeText(from, text, session) {
   switch (session.step) {
-    case "ASK_PASSENGERS_DATE": {
-      const parts = text.split(",").map((p) => p.trim());
-      if (parts.length < 2) {
-        await sendText(from, `Please send both separated by a comma, e.g. "2, 25 Sept"`);
-        return;
-      }
-      const count = parseInt(parts[0], 10);
+    case "ASK_PASSENGERS": {
+      const count = parseInt(text, 10);
       if (isNaN(count) || count < 1) {
-        await sendText(from, `Number of passengers must be a number. Please resend, e.g. "2, 25 Sept"`);
+        await sendText(from, "Please send a valid number, e.g. 2");
         return;
       }
-      const dateText = parts.slice(1).join(", ");
-      const parsedDate = chrono.parseDate(dateText, new Date(), { forwardDate: true });
-      if (!parsedDate) {
-        await sendText(from, `Couldn't understand that date. Please try again, e.g. "2, 25 Sept"`);
-        return;
-      }
-      const isoDate = parsedDate.toISOString().split("T")[0];
       session.draft.passengerCount = count;
-      session.draft.date = isoDate;
       await saveSession(from, session);
       await sendButtons(from, "Preferred time of day?", [
         { id: "time_morning", title: "🌅 Morning" },
@@ -289,11 +287,11 @@ async function routeFreeText(from, text, session) {
 
     default:
       await sendText(from, "Oops, we didn't quite get that 🙏");
-      await sendWelcome(from);
+      await sendMainMenu(from);
   }
 }
 
-export async function handleBulkFormSubmission({ phone, passengers }) {
+export async function handleBulkFormSubmission({ phone, passengers, date }) {
   const session = getSession(phone);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
 
@@ -306,6 +304,8 @@ export async function handleBulkFormSubmission({ phone, passengers }) {
     }
     session.draft.passengerList.push({ name: p.name, age: p.age, weight: w, email: p.email });
   }
+
+  session.draft.date = date;
 
   if (session.draft.passengerList.length === 1) {
     session.draft.email = session.draft.passengerList[0].email;
