@@ -154,7 +154,7 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
   if (current < total) {
     current++;
     document.getElementById('heading').textContent = 'Passenger ' + current + ' of ' + total;
-    document.getElementById('dateField').style.display = 'Select date';
+    document.getElementById('dateField').style.display = 'Date';
     document.getElementById('name').value = '';
     document.getElementById('age').value = '';
     document.getElementById('weight').value = '';
