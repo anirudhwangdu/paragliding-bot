@@ -366,33 +366,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       ? "booking_confirmed_bangalore"
       : "booking_confirmed_allepey";
 
-    // Convert customer's selected date: YYYY-MM-DD
-    const [year, month, day] = date.split("-").map(Number);
-
-    // Day of week:
-    // 0 = Sunday, 1 = Monday, ... 6 = Saturday
-    const selectedDate = new Date(year, month - 1, day);
-    const dayOfWeek = selectedDate.getDay();
-
     await sendTemplate(phone, templateName, "en", [
-      {
-        type: "header",
-        parameters: [
-          {
-            type: "date_time",
-            date_time: {
-              fallback_value: `${day}/${month}/${year}`,
-              day_of_week: dayOfWeek,
-              year: year,
-              month: month,
-              day_of_month: day,
-              hour: 0,
-              minute: 0,
-              calendar: "GREGORIAN"
-            }
-          }
-        ]
-      },
       {
         type: "body",
         parameters: [
