@@ -3,7 +3,7 @@ import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import { nanoid } from "nanoid";
-import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendTemplate } from "./whatsappClient.js";
+import { sendText, sendButtons, sendList, sendVideo, sendImage, sendTemplate } from "./whatsappClient.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
