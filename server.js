@@ -99,48 +99,124 @@ function renderFormPage(to, total, botNumber) {
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Passenger Details</title>
+
 <style>
-body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
-h2{color:#1a3c6e;}
-input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
-button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
-button:disabled{opacity:0.6;}
-#dateField{display:block;}
-#thankyou{display:none;text-align:center;}
+body{
+  font-family:sans-serif;
+  padding:20px;
+  background:#f7f7f7;
+}
+
+h2{
+  color:#1a3c6e;
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+  border:1px solid #ccc;
+  border-radius:8px;
+  font-size:16px;
+  box-sizing:border-box;
+}
+
+#dateField label{
+  display:block;
+  font-size:16px;
+  font-weight:600;
+  color:#333;
+  margin:8px 0 6px;
+}
+
+button,
+a.btn{
+  display:block;
+  width:100%;
+  padding:14px;
+  background:#1a3c6e;
+  color:white;
+  border:none;
+  border-radius:8px;
+  font-size:16px;
+  margin-top:10px;
+  text-align:center;
+  text-decoration:none;
+  box-sizing:border-box;
+}
+
+button:disabled{
+  opacity:0.6;
+}
+
+#dateField{
+  display:block;
+}
+
+#thankyou{
+  display:none;
+  text-align:center;
+}
 </style>
 </head>
+
 <body>
+
 <div id="formWrap">
-<h2 id="heading">Passenger 1 of ${total}</h2>
-<form id="paxForm">
-  <div id="dateField">
-    <input type="date" id="flightDate" required>
-  </div>
-  <input type="text" id="name" placeholder="Full Name" required>
-  <input type="number" id="age" placeholder="Age" required>
-  <input type="number" id="weight" placeholder="Weight (kg)" required>
-  <input type="email" id="email" placeholder="Email address" required>
-  <button type="submit" id="submitBtn">${total > 1 ? "Next" : "Submit"}</button>
-</form>
+  <h2 id="heading">Passenger 1 of ${total}</h2>
+
+  <form id="paxForm">
+
+    <div id="dateField">
+      <label for="flightDate">📅 Select Flight Date</label>
+      <input type="date" id="flightDate" required>
+    </div>
+
+    <input type="text" id="name" placeholder="Full Name" required>
+
+    <input type="number" id="age" placeholder="Age" required>
+
+    <input type="number" id="weight" placeholder="Weight (kg)" required>
+
+    <input type="email" id="email" placeholder="Email address" required>
+
+    <button type="submit" id="submitBtn">
+      ${total > 1 ? "Next" : "Submit"}
+    </button>
+
+  </form>
 </div>
+
 <div id="thankyou">
   <h2>✅ Details saved!</h2>
   <p>Redirecting you back to WhatsApp...</p>
-  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
+
+  <a class="btn" href="https://wa.me/${botNumber}">
+    Return to Chat
+  </a>
 </div>
+
 <script>
 const total = ${total};
+
 let current = 1;
 let isSubmitting = false;
+
 const passengers = [];
+
 let flightDate = '';
 
-document.getElementById('paxForm').addEventListener('submit', async function(e){
+document.getElementById('paxForm').addEventListener('submit', async function(e) {
+
   e.preventDefault();
+
   if (isSubmitting) return;
+
   isSubmitting = true;
+
   document.getElementById('submitBtn').disabled = true;
 
+  // Get flight date from Passenger 1
   if (current === 1) {
     flightDate = document.getElementById('flightDate').value;
   }
@@ -149,32 +225,85 @@ document.getElementById('paxForm').addEventListener('submit', async function(e){
   const age = document.getElementById('age').value;
   const weight = document.getElementById('weight').value;
   const email = document.getElementById('email').value;
-  passengers.push({ name, age, weight, email });
 
+  passengers.push({
+    name,
+    age,
+    weight,
+    email
+  });
+
+  // Move to next passenger
   if (current < total) {
+
     current++;
-    document.getElementById('heading').textContent = 'Passenger ' + current + ' of ' + total;
-    document.getElementById('dateField').style.display = 'Date';
+
+    document.getElementById('heading').textContent =
+      'Passenger ' + current + ' of ' + total;
+
+    // Hide date field after Passenger 1
+    document.getElementById('dateField').style.display = 'none';
+
+    // Clear passenger fields
     document.getElementById('name').value = '';
     document.getElementById('age').value = '';
     document.getElementById('weight').value = '';
     document.getElementById('email').value = '';
-    document.getElementById('submitBtn').textContent = current < total ? 'Next' : 'Submit';
+
+    document.getElementById('submitBtn').textContent =
+      current < total ? 'Next' : 'Submit';
+
     document.getElementById('submitBtn').disabled = false;
+
     isSubmitting = false;
+
     return;
   }
 
-  await fetch('/passenger-form-submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ phone: "${to}", passengers, date: flightDate })
-  });
-  document.getElementById('formWrap').style.display = 'none';
-  document.getElementById('thankyou').style.display = 'block';
-  window.location.href = "https://wa.me/${botNumber}";
+  // Submit all passenger information
+  try {
+
+    const response = await fetch('/passenger-form-submit', {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json'
+      },
+
+      body: JSON.stringify({
+        phone: "${to}",
+        passengers: passengers,
+        date: flightDate
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save passenger details');
+    }
+
+    // Show success message
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('thankyou').style.display = 'block';
+
+    // Redirect to WhatsApp
+    setTimeout(() => {
+      window.location.href = "https://wa.me/${botNumber}";
+    }, 1000);
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert('Unable to save the details. Please try again.');
+
+    document.getElementById('submitBtn').disabled = false;
+
+    isSubmitting = false;
+  }
+
 });
 </script>
+
 </body>
 </html>`;
 }
