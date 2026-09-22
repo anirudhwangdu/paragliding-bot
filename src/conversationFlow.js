@@ -21,7 +21,7 @@ export async function handleIncomingMessage(from, message) {
   const session = getSession(from);
 
   if (isNewSession && process.env.HUMAN_HANDOFF_NUMBER) {
-    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
+    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "new_chat_alert", "en", [
       { type: "body", parameters: [{ type: "text", text: from }] },
     ]).catch((e) => console.error("New chat notification failed:", e.message));
   }
