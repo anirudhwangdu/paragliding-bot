@@ -294,7 +294,12 @@ async function routeFreeText(from, text, session) {
 export async function handleBulkFormSubmission({ phone, passengers, date }) {
   const session = getSession(phone);
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
+  const session = getSession(phone);
 
+  // Save the date selected by the customer in the passenger form
+  if (date) {
+    session.draft.date = date;
+  }
   for (const p of passengers) {
     const w = parseInt(p.weight, 10);
     if (isNaN(w) || w > maxWeight) {
