@@ -18,14 +18,21 @@ export async function handleIncomingMessage(from, message) {
 
   const isNewSession = !hasSession(from);
   const session = getSession(from);
+  const isGreeting = ["hi", "hello", "hey", "menu", "start"].includes(lower);
 
-  if (isNewSession && (["hi", "hello", "hey", "menu", "start"].includes(lower) || !session.step)) {
-    session.step = "AWAITING_INITIAL_LOCATION";
+  if (isGreeting) {
+    if (isNewSession || !session.draft?.locationKey) {
+      session.step = "AWAITING_INITIAL_LOCATION";
+      await saveSession(from, session);
+      await sendButtons(from, "👋 Welcome! Which location are you interested in?", [
+        { id: "greet_bangalore", title: "Bangalore" },
+        { id: "greet_alleppey", title: "Alleppey" },
+      ]);
+      return;
+    }
+    session.step = "IDLE";
     await saveSession(from, session);
-    await sendButtons(from, "👋 Welcome! Which location are you interested in?", [
-      { id: "greet_bangalore", title: "Bangalore" },
-      { id: "greet_alleppey", title: "Alleppey" },
-    ]);
+    await sendWelcome(from);
     return;
   }
 
