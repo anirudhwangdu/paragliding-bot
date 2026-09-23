@@ -43,7 +43,7 @@ export async function handleIncomingMessage(from, message) {
     }
     session.step = "IDLE";
     await saveSession(from, session);
-    await sendWelcome(from);
+    await sendWelcome(from, session.draft?.location);
     return;
   }
 
@@ -57,13 +57,16 @@ export async function handleIncomingMessage(from, message) {
   await routeFreeText(from, text, session);
 }
 
-async function sendWelcome(to) {
+async function sendWelcome(to, locationLabel) {
   if (process.env.WELCOME_VIDEO_ID) {
     await sendVideoById(to, process.env.WELCOME_VIDEO_ID, "See what flying with us feels like! 🪂");
   } else if (process.env.WELCOME_VIDEO_URL) {
     await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
   }
-  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️`);
+  const locationNote = locationLabel
+    ? `\n\n📍 Currently set to *${locationLabel}*. Want a different location? Just type "menu".`
+    : "";
+  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️${locationNote}`);
   await sendMainMenu(to);
 }
 
