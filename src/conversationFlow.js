@@ -18,7 +18,18 @@ export async function handleIncomingMessage(from, message) {
 
   const isNewSession = !hasSession(from);
   const session = getSession(from);
-  const isGreeting = ["hi", "hello", "hey", "menu", "start"].includes(lower);
+  const isGreeting = ["hi", "hello", "hey", "start"].includes(lower);
+  const isMenu = lower === "menu";
+
+  if (isMenu) {
+    session.step = "AWAITING_INITIAL_LOCATION";
+    await saveSession(from, session);
+    await sendButtons(from, "Which location would you like to fly at?", [
+      { id: "greet_bangalore", title: "Bangalore" },
+      { id: "greet_alleppey", title: "Alleppey" },
+    ]);
+    return;
+  }
 
   if (isGreeting) {
     if (isNewSession || !session.draft?.locationKey) {
