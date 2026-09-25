@@ -313,7 +313,7 @@ async function processReminders() {
   try {
     const bookings = await getBookingsNeedingReminder();
     for (const b of bookings) {
-      await sendTemplate(b.phone, "flight_reminder", "en", [
+      await sendTemplate(b.phone, "flight_remainder", "en", [
         {
           type: "body",
           parameters: [
