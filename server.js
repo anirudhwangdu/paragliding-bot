@@ -356,6 +356,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       name,
       weight,
       date,
+      timeSlot,
       package: pkg,
       passengerCount,
       advance,
@@ -366,21 +367,27 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       ? "booking_confirmed_bangalore"
       : "booking_confirmed_allepey";
 
+    const params = [
+      { type: "text", text: name },
+      { type: "text", text: String(weight) },
+      { type: "text", text: date },
+      { type: "text", text: timeSlot || "TBD" },
+      { type: "text", text: pkg },
+      { type: "text", text: String(passengerCount) },
+      { type: "text", text: String(advance) },
+      { type: "text", text: String(balance) },
+      { type: "text", text: "89517 71232" }
+    ];
+
     await sendTemplate(phone, templateName, "en", [
-      {
-        type: "body",
-        parameters: [
-          { type: "text", text: name },
-          { type: "text", text: String(weight) },
-          { type: "text", text: date },
-          { type: "text", text: pkg },
-          { type: "text", text: String(passengerCount) },
-          { type: "text", text: String(advance) },
-          { type: "text", text: String(balance) },
-          { type: "text", text: "89517 71232" }
-        ]
-      }
+      { type: "body", parameters: params }
     ]);
+
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, templateName, "en", [
+        { type: "body", parameters: params }
+      ]);
+    }
 
     if (email) {
       await sendConfirmationEmail(
@@ -390,6 +397,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
          <p><b>Name:</b> ${name}</p>
          <p><b>Weight:</b> ${weight} kg</p>
          <p><b>Date:</b> ${date}</p>
+         <p><b>Time Slot:</b> ${timeSlot || "TBD"}</p>
          <p><b>Package:</b> ${pkg}</p>
          <p><b>Passengers:</b> ${passengerCount}</p>
          <p><b>Advance paid:</b> ₹${advance}</p>
