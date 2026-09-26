@@ -416,3 +416,50 @@ app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   processReminders(); // Run once on startup
 });
+app.post("/booking-cancelled", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { phone, name, package: pkg } = req.body;
+    await sendTemplate(phone, "booking_cancelled", "en", [
+      { type: "body", parameters: [
+        { type: "text", text: name },
+        { type: "text", text: pkg },
+      ]},
+    ]);
+  } catch (err) {
+    console.error("Cancellation notice failed:", err.response?.data || err.message);
+  }
+});
+
+app.post("/timeslot-updated", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { phone, timeSlot, date } = req.body;
+    await sendTemplate(phone, "timeslot_confirmed", "en", [
+      { type: "body", parameters: [
+        { type: "text", text: timeSlot },
+        { type: "text", text: date },
+      ]},
+    ]);
+  } catch (err) {
+    console.error("Time slot notice failed:", err.response?.data || err.message);
+  }
+});
+
+app.post("/booking-review", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { phone, location } = req.body;
+    const isBangalore = location && location.toLowerCase().includes("bangalore");
+    const templateName = isBangalore ? "review_request_bangalore" : "review_request_alleppey";
+    const reviewLink = isBangalore
+      ? process.env.GOOGLE_REVIEW_LINK_BANGALORE
+      : process.env.GOOGLE_REVIEW_LINK_ALLEPPEY;
+
+    await sendTemplate(phone, templateName, "en", [
+      { type: "body", parameters: [{ type: "text", text: reviewLink }] },
+    ]);
+  } catch (err) {
+    console.error("Review request failed:", err.response?.data || err.message);
+  }
+});
