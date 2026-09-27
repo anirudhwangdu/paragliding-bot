@@ -73,7 +73,7 @@ export async function getBookingsNeedingReminder() {
   const sheets = getClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!A2:U",
+    range: "Sheet1!A2:T",
   });
   const rows = res.data.values || [];
   const tomorrow = new Date();
@@ -86,8 +86,9 @@ export async function getBookingsNeedingReminder() {
     const bookingId = row[0], phone = row[1], location = row[2], pkg = row[3],
           paxCount = row[5], date = row[6], timePref = row[7], name = row[11],
           status = row[18], reminderSent = row[19];
-    const isCancelled = (status || "").toLowerCase().trim() === "cancelled";
-    if (date === tomorrowStr && reminderSent !== "yes" && !isCancelled && !seen.has(bookingId)) {
+    const statusLower = (status || "").toLowerCase().trim();
+    const shouldSkip = statusLower === "cancelled" || statusLower === "pending" || statusLower === "";
+    if (date === tomorrowStr && reminderSent !== "yes" && !shouldSkip && !seen.has(bookingId)) {
       seen.add(bookingId);
       results.push({ rowIndex: idx + 2, bookingId, phone, location, package: pkg, paxCount, date, timePref, name });
     }
