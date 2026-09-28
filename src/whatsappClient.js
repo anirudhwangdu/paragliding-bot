@@ -95,3 +95,12 @@ export async function sendImageById(to, mediaId, caption) {
     image: { id: mediaId, caption: caption || "" },
   });
 }
+
+export async function sendVideoById(to, mediaId, caption) {
+  return client().post("/messages", {
+    messaging_product: "whatsapp",
+    to,
+    type: "video",
+    video: { id: mediaId, caption: caption || "" },
+  });
+}
