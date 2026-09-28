@@ -86,3 +86,12 @@ export async function sendImage(to, imageUrl, caption) {
     image: { link: imageUrl, caption: caption || "" },
   });
 }
+
+export async function sendImageById(to, mediaId, caption) {
+  return client().post("/messages", {
+    messaging_product: "whatsapp",
+    to,
+    type: "image",
+    image: { id: mediaId, caption: caption || "" },
+  });
+}

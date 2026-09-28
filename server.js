@@ -7,7 +7,7 @@ import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
-
+import { refreshMedia } from "./src/mediaCache.js";
 
 // Initialize environment variables
 dotenv.config();
@@ -418,11 +418,13 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
 
 // Run reminder service every hour
 setInterval(processReminders, 60 * 60 * 1000);
+setInterval(refreshMedia, 7 * 24 * 60 * 60 * 1000); // refresh weekly, before the 30-day expiry
 
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   processReminders(); // Run once on startup
+  refreshMedia();     // Upload video + QR to Meta on startup
 });
 app.post("/booking-cancelled", express.json(), async (req, res) => {
   res.sendStatus(200);

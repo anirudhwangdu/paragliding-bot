@@ -3,7 +3,8 @@ import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import { nanoid } from "nanoid";
-import { sendText, sendButtons, sendList, sendVideo, sendImage, sendTemplate } from "./whatsappClient.js";
+import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
+import { getMediaId } from "./mediaCache.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -58,8 +59,9 @@ export async function handleIncomingMessage(from, message) {
 }
 
 async function sendWelcome(to, locationLabel) {
-  if (process.env.WELCOME_VIDEO_ID) {
-    await sendVideoById(to, process.env.WELCOME_VIDEO_ID, "See what flying with us feels like! 🪂");
+  const videoId = getMediaId("video");
+  if (videoId) {
+    await sendVideoById(to, videoId, "See what flying with us feels like! 🪂");
   } else if (process.env.WELCOME_VIDEO_URL) {
     await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
   }
@@ -226,7 +228,7 @@ async function routeInteractive(from, id, session) {
     return;
   }
 
-  if (id === "confirm_yes") {
+    if (id === "confirm_yes") {
     const bookingId = await getNextBookingId();
     const customerRef = "SKY-" + nanoid(6).toUpperCase();
     const chosenPkg = findPackage(session.draft.selectedPackageId);
@@ -265,7 +267,10 @@ async function routeInteractive(from, id, session) {
         `Please pay the advance of ₹${advance} using the QR code below. ` +
         `Once received, we'll confirm your slot.`
     );
-    if (process.env.QR_IMAGE_URL) {
+    const qrId = getMediaId("qr");
+    if (qrId) {
+      await sendImageById(from, qrId, `Advance payment: ₹${advance}`);
+    } else if (process.env.QR_IMAGE_URL) {
       await sendImage(from, process.env.QR_IMAGE_URL, `Advance payment: ₹${advance}`);
     }
     if (process.env.HUMAN_HANDOFF_NUMBER) {
@@ -278,11 +283,6 @@ async function routeInteractive(from, id, session) {
       );
     }
     await resetSession(from);
-    return;
-  }
-  if (id === "confirm_no") {
-    await resetSession(from);
-    await sendText(from, "No problem, booking cancelled. Type 'menu' anytime to start again.");
     return;
   }
 
