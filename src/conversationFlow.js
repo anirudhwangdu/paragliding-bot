@@ -4,7 +4,7 @@ import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
-import { getMediaId } from "./MediaCache.js";
+import { getMediaId } from "./mediaCache.js";
 
 function requireAuth(req, res, next) {
   const auth = req.headers.authorization;
