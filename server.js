@@ -7,9 +7,8 @@ import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
-import { refreshMedia } from "./src/MediaCache.js";
+import { refreshMedia } from "./src/mediaCache.js";
 import { getAllBookings, updateBookingField, getConversations } from "./src/sheets.js";
-import { sendConfirmationEmail } from "./src/email.js";
 
 // Initialize environment variables
 dotenv.config();
