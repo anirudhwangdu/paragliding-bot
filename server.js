@@ -16,6 +16,28 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const [scheme, encoded] = header.split(" ");
+
+  if (scheme === "Basic" && encoded) {
+    const decoded = Buffer.from(encoded, "base64").toString();
+    const idx = decoded.indexOf(":");
+    const user = decoded.slice(0, idx);
+    const pass = decoded.slice(idx + 1);
+
+    if (
+      user === process.env.DASHBOARD_USER &&
+      pass === process.env.DASHBOARD_PASSWORD
+    ) {
+      return next();
+    }
+  }
+
+  res.set("WWW-Authenticate", 'Basic realm="Sky Sail Dashboard"');
+  return res.status(401).send("Authentication required");
+}
+
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
