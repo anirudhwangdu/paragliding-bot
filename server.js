@@ -7,7 +7,9 @@ import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
-import { refreshMedia } from "./src/mediaCache.js";
+import { refreshMedia } from "./src/MediaCache.js";
+import { getAllBookings, updateBookingField, getConversations } from "./src/sheets.js";
+import { sendConfirmationEmail } from "./src/email.js";
 
 // Initialize environment variables
 dotenv.config();
@@ -420,6 +422,107 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
 setInterval(processReminders, 60 * 60 * 1000);
 setInterval(refreshMedia, 7 * 24 * 60 * 60 * 1000); // refresh weekly, before the 30-day expiry
 
+app.get("/dashboard", requireAuth, (req, res) => {
+  res.send(renderDashboardPage());
+});
+
+app.get("/api/bookings", requireAuth, async (req, res) => {
+  try {
+    const bookings = await getAllBookings();
+    res.json(bookings);
+  } catch (err) {
+    console.error("Failed to load bookings:", err.message);
+    res.status(500).json({ error: "Failed to load bookings" });
+  }
+});
+
+app.get("/api/conversations", requireAuth, async (req, res) => {
+  try {
+    const messages = await getConversations(req.query.phone);
+    res.json(messages);
+  } catch (err) {
+    console.error("Failed to load conversation:", err.message);
+    res.status(500).json({ error: "Failed to load conversation" });
+  }
+});
+
+app.post("/api/reply", requireAuth, express.json(), async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+    await sendText(phone, message);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Reply failed:", err.response?.data || err.message);
+    res.status(500).json({ success: false, error: err.response?.data?.error?.message || err.message });
+  }
+});
+
+app.post("/api/booking-action", requireAuth, express.json(), async (req, res) => {
+  try {
+    const { bookingId, rowIndexes, action, timeSlot } = req.body;
+    const bookings = await getAllBookings();
+    const booking = bookings.find((b) => b.bookingId === bookingId);
+    if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
+
+    if (timeSlot) {
+      await updateBookingField(rowIndexes, "Time Slot", timeSlot);
+      booking.timeSlot = timeSlot;
+    }
+
+    const isBangalore = booking.location.toLowerCase().includes("bangalore");
+    const first = booking.passengers[0];
+
+    if (action === "approved") {
+      const templateName = isBangalore ? "booking_confirmed_bangalore" : "booking_confirmed_allepey";
+      const params = [
+        { type: "text", text: first.name },
+        { type: "text", text: String(first.weight) },
+        { type: "text", text: booking.date },
+        { type: "text", text: booking.timeSlot || "TBD" },
+        { type: "text", text: booking.package },
+        { type: "text", text: String(booking.passengerCount) },
+        { type: "text", text: String(booking.advance) },
+        { type: "text", text: String(booking.balance) },
+        { type: "text", text: "89517 71232" },
+      ];
+      await sendTemplate(booking.phone, templateName, "en", [{ type: "body", parameters: params }]);
+      if (process.env.HUMAN_HANDOFF_NUMBER) {
+        await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, templateName, "en", [{ type: "body", parameters: params }]);
+      }
+      if (booking.confirmationEmail) {
+        await sendConfirmationEmail(
+          booking.confirmationEmail,
+          "Your Sky Sail Adventures Booking is Confirmed! ✅",
+          `<h2>🪂 Sky Sail Adventures - Booking Confirmed ✅</h2>
+           <p><b>Name:</b> ${first.name}</p>
+           <p><b>Date:</b> ${booking.date}</p>
+           <p><b>Time Slot:</b> ${booking.timeSlot || "TBD"}</p>
+           <p><b>Package:</b> ${booking.package}</p>
+           <p><b>Advance paid:</b> ₹${booking.advance}</p>
+           <p><b>Balance due:</b> ₹${booking.balance}</p>
+           <p>See you in the sky! ✈️</p>`
+        );
+      }
+    } else if (action === "complete") {
+      const templateName = isBangalore ? "review_request_bangalore" : "review_request_alleppey";
+      const reviewLink =
+        (isBangalore ? process.env.GOOGLE_REVIEW_LINK_BANGALORE : process.env.GOOGLE_REVIEW_LINK_ALLEPPEY) ||
+        "https://www.skysailadventures.com";
+      await sendTemplate(booking.phone, templateName, "en", [{ type: "body", parameters: [{ type: "text", text: reviewLink }] }]);
+    } else if (action === "cancelled") {
+      await sendTemplate(booking.phone, "booking_cancelled", "en", [
+        { type: "body", parameters: [{ type: "text", text: first.name }, { type: "text", text: booking.package }] },
+      ]);
+    }
+
+    await updateBookingField(rowIndexes, "Status", action);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Booking action failed:", err.response?.data || err.message);
+    res.status(500).json({ success: false, error: err.response?.data?.error?.message || err.message });
+  }
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
@@ -473,3 +576,168 @@ app.post("/booking-review", express.json(), async (req, res) => {
     console.error("Review request failed:", err.response?.data || err.message);
   }
 });
+
+function renderDashboardPage() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky Sail Dashboard</title>
+<style>
+*{box-sizing:border-box;}
+body{font-family:sans-serif;margin:0;background:#f4f5f7;color:#1a1a1a;}
+header{background:#1a3c6e;color:white;padding:16px 20px;}
+header h1{margin:0;font-size:18px;}
+.controls{display:flex;gap:10px;padding:12px 20px;flex-wrap:wrap;background:white;border-bottom:1px solid #ddd;}
+select,input{padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;}
+.list{padding:12px 20px;}
+.card{background:white;border-radius:10px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1);cursor:pointer;}
+.card .top{display:flex;justify-content:space-between;font-weight:bold;}
+.badge{padding:2px 10px;border-radius:20px;font-size:12px;text-transform:capitalize;}
+.badge.pending{background:#fff3cd;color:#856404;}
+.badge.approved{background:#d4edda;color:#155724;}
+.badge.complete{background:#d1ecf1;color:#0c5460;}
+.badge.cancelled{background:#f8d7da;color:#721c24;}
+.meta{color:#555;font-size:13px;margin-top:4px;}
+#detail{position:fixed;top:0;right:0;width:100%;max-width:420px;height:100%;background:white;box-shadow:-2px 0 10px rgba(0,0,0,0.2);transform:translateX(100%);transition:0.2s;overflow-y:auto;padding:16px;z-index:10;}
+#detail.open{transform:translateX(0);}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);display:none;z-index:9;}
+#overlay.open{display:block;}
+.close{float:right;cursor:pointer;font-size:20px;}
+.actionBtns button{padding:10px;border:none;border-radius:6px;color:white;margin:4px 4px 4px 0;cursor:pointer;}
+.btn-approve{background:#28a745;}
+.btn-complete{background:#17a2b8;}
+.btn-cancel{background:#dc3545;}
+.chat{border-top:1px solid #eee;margin-top:14px;padding-top:10px;max-height:220px;overflow-y:auto;font-size:13px;}
+.msg{margin-bottom:6px;padding:6px 10px;border-radius:8px;max-width:80%;}
+.msg.in{background:#eee;}
+.msg.out{background:#d4e6ff;margin-left:auto;}
+.replyBox{display:flex;gap:6px;margin-top:8px;}
+.replyBox input{flex:1;}
+</style>
+</head>
+<body>
+<header><h1>🪂 Sky Sail Adventures — Bookings</h1></header>
+<div class="controls">
+  <select id="fLocation"><option value="">All Locations</option><option>Bangalore</option><option>Alleppey</option></select>
+  <select id="fStatus"><option value="">All Statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="complete">Complete</option><option value="cancelled">Cancelled</option></select>
+  <input type="date" id="fDate">
+</div>
+<div class="list" id="list">Loading...</div>
+
+<div id="overlay" onclick="closeDetail()"></div>
+<div id="detail"></div>
+
+<script>
+let bookings = [];
+
+async function load() {
+  const res = await fetch('/api/bookings');
+  bookings = await res.json();
+  render();
+}
+
+function render() {
+  const loc = document.getElementById('fLocation').value;
+  const status = document.getElementById('fStatus').value;
+  const date = document.getElementById('fDate').value;
+  const filtered = bookings.filter(b =>
+    (!loc || b.location === loc) &&
+    (!status || b.status === status) &&
+    (!date || b.date === date)
+  );
+  document.getElementById('list').innerHTML = filtered.map(b => \`
+    <div class="card" onclick='openDetail(\${JSON.stringify(b.bookingId)})'>
+      <div class="top"><span>\${b.customerRef || b.bookingId}</span><span class="badge \${b.status}">\${b.status}</span></div>
+      <div class="meta">\${b.location} — \${b.package}</div>
+      <div class="meta">\${b.date} \${b.timeSlot ? '· ' + b.timeSlot : ''} · \${b.passengerCount} pax · \${b.phone}</div>
+    </div>
+  \`).join('') || '<p>No bookings match.</p>';
+}
+
+async function openDetail(bookingId) {
+  const b = bookings.find(x => x.bookingId === bookingId);
+  document.getElementById('overlay').classList.add('open');
+  const d = document.getElementById('detail');
+  d.classList.add('open');
+  d.innerHTML = \`
+    <span class="close" onclick="closeDetail()">✕</span>
+    <h2>\${b.customerRef || b.bookingId}</h2>
+    <p><b>Status:</b> <span class="badge \${b.status}">\${b.status}</span></p>
+    <p>\${b.location} — \${b.package}</p>
+    <p>\${b.date} · \${b.timePreference}</p>
+    <p>Phone: \${b.phone}</p>
+    <p>Email: \${b.confirmationEmail || ''}</p>
+    <p>Advance ₹\${b.advance} · Balance ₹\${b.balance}</p>
+    <p><b>Passengers</b></p>
+    <ul>\${b.passengers.map(p => \`<li>\${p.name}, \${p.age}y, \${p.weight}kg — \${p.email}</li>\`).join('')}</ul>
+    <div>
+      <label>Time Slot</label><br>
+      <input type="text" id="timeSlotInput" value="\${b.timeSlot || ''}" placeholder="6:00 AM" style="width:100%;padding:8px;margin:6px 0;">
+    </div>
+    <div class="actionBtns">
+      <button class="btn-approve" onclick='doAction(\${JSON.stringify(b.bookingId)}, \${JSON.stringify(b.rowIndexes)}, "approved")'>Approve</button>
+      <button class="btn-complete" onclick='doAction(\${JSON.stringify(b.bookingId)}, \${JSON.stringify(b.rowIndexes)}, "complete")'>Complete</button>
+      <button class="btn-cancel" onclick='doAction(\${JSON.stringify(b.bookingId)}, \${JSON.stringify(b.rowIndexes)}, "cancelled")'>Cancel</button>
+    </div>
+    <div class="chat" id="chatBox">Loading chat...</div>
+    <div class="replyBox">
+      <input type="text" id="replyInput" placeholder="Type a reply...">
+      <button onclick='sendReply(\${JSON.stringify(b.phone)})'>Send</button>
+    </div>
+  \`;
+  loadChat(b.phone);
+}
+
+function closeDetail() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('detail').classList.remove('open');
+}
+
+async function doAction(bookingId, rowIndexes, action) {
+  const timeSlot = document.getElementById('timeSlotInput').value;
+  const res = await fetch('/api/booking-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId, rowIndexes, action, timeSlot }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('Done: ' + action);
+    closeDetail();
+    load();
+  } else {
+    alert('Failed: ' + data.error);
+  }
+}
+
+async function loadChat(phone) {
+  const res = await fetch('/api/conversations?phone=' + encodeURIComponent(phone));
+  const msgs = await res.json();
+  document.getElementById('chatBox').innerHTML = msgs.map(m =>
+    \`<div class="msg \${m.direction}">\${m.message}</div>\`
+  ).join('') || 'No messages yet.';
+}
+
+async function sendReply(phone) {
+  const input = document.getElementById('replyInput');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+  await fetch('/api/reply', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, message }),
+  });
+  loadChat(phone);
+}
+
+document.getElementById('fLocation').addEventListener('change', render);
+document.getElementById('fStatus').addEventListener('change', render);
+document.getElementById('fDate').addEventListener('change', render);
+
+load();
+</script>
+</body>
+</html>`;
+}

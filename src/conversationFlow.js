@@ -4,7 +4,21 @@ import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
-import { getMediaId } from "./mediaCache.js";
+import { getMediaId } from "./MediaCache.js";
+
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Dashboard"');
+    return res.status(401).send("Authentication required");
+  }
+  const [user, pass] = Buffer.from(auth.split(" ")[1], "base64").toString().split(":");
+  if (user === process.env.DASHBOARD_USER && pass === process.env.DASHBOARD_PASSWORD) {
+    return next();
+  }
+  res.set("WWW-Authenticate", 'Basic realm="Dashboard"');
+  return res.status(401).send("Invalid credentials");
+}
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 

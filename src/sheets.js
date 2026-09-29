@@ -105,3 +105,91 @@ export async function markReminderSent(rowIndex) {
     requestBody: { values: [["yes"]] },
   });
 }
+
+async function getHeaderMap() {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A1:Z1",
+  });
+  const headers = res.data.values[0];
+  const map = {};
+  headers.forEach((h, i) => (map[h] = i));
+  return map;
+}
+
+export async function getAllBookings() {
+  const sheets = getClient();
+  const map = await getHeaderMap();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A2:Z",
+  });
+  const rows = res.data.values || [];
+  const byId = {};
+
+  rows.forEach((row, idx) => {
+    const id = row[map["Booking ID"]];
+    if (!id) return;
+    if (!byId[id]) {
+      byId[id] = {
+        bookingId: id,
+        phone: row[map["Phone"]],
+        location: row[map["Location"]],
+        package: row[map["Package"]],
+        price: row[map["Price"]],
+        passengerCount: row[map["Passenger Count"]],
+        date: row[map["Date"]],
+        timePreference: row[map["Time Preference"]],
+        confirmationEmail: row[map["Confirmation Email"]],
+        customerRef: row[map["Customer Reference"]],
+        advance: row[map["Advance Paid"]],
+        balance: row[map["Balance Due"]],
+        status: row[map["Status"]] || "pending",
+        timeSlot: row[map["Time Slot"]] || "",
+        passengers: [],
+        rowIndexes: [],
+      };
+    }
+    byId[id].passengers.push({
+      name: row[map["Name"]],
+      age: row[map["Age"]],
+      weight: row[map["Weight"]],
+      email: row[map["Email"]],
+    });
+    byId[id].rowIndexes.push(idx + 2);
+  });
+
+  return Object.values(byId).sort((a, b) => (a.bookingId < b.bookingId ? 1 : -1));
+}
+
+export async function updateBookingField(rowIndexes, fieldName, value) {
+  const sheets = getClient();
+  const map = await getHeaderMap();
+  const col = map[fieldName];
+  if (col === undefined) throw new Error(`Column "${fieldName}" not found`);
+  const colLetter = String.fromCharCode(65 + col);
+
+  const data = rowIndexes.map((rowIndex) => ({
+    range: `Sheet1!${colLetter}${rowIndex}`,
+    values: [[value]],
+  }));
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    requestBody: { valueInputOption: "USER_ENTERED", data },
+  });
+}
+
+export async function getConversations(phone) {
+  const sheets = getClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Conversations!A:D",
+  });
+  const rows = res.data.values || [];
+  return rows
+    .filter((r) => r[1] === phone)
+    .map((r) => ({ timestamp: r[0], direction: r[2], message: r[3] }))
+    .slice(-100);
+}
