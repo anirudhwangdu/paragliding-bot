@@ -192,3 +192,19 @@ export async function getConversations(phone) {
     .map((r) => ({ timestamp: r[0], direction: r[2], message: r[3] }))
     .slice(-100);
 }
+
+export async function logHandoff(phone) {
+  try {
+    const sheets = getClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "Handoffs!A:B",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[new Date().toISOString(), phone]],
+      },
+    });
+  } catch (err) {
+    console.error("Failed to log handoff:", err.response?.data || err.message);
+  }
+}

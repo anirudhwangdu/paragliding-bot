@@ -5,6 +5,7 @@ import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
 import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
 import { getMediaId } from "./mediaCache.js";
+import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
 
 function requireAuth(req, res, next) {
   const auth = req.headers.authorization;
@@ -375,6 +376,7 @@ async function handOffToHuman(to) {
     "🙋 Connecting you with our team — someone will reply here shortly. " +
       "For urgent safety issues, please call us directly."
   );
+  logHandoff(to).catch((e) => console.error("Handoff logging failed:", e.message));
   if (process.env.HUMAN_HANDOFF_NUMBER) {
     sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
       { type: "body", parameters: [{ type: "text", text: to }] },
