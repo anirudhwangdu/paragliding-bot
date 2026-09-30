@@ -1,11 +1,10 @@
 import { getSession, saveSession, resetSession, saveBooking, hasSession } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
-import { appendBookingToSheet, getNextBookingId } from "./sheets.js";
+import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
 import { nanoid } from "nanoid";
 import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
 import { getMediaId } from "./mediaCache.js";
-import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
 
 function requireAuth(req, res, next) {
   const auth = req.headers.authorization;
