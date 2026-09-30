@@ -87,8 +87,7 @@ export async function getBookingsNeedingReminder() {
           paxCount = row[5], date = row[6], timePref = row[7], name = row[11],
           status = row[18], reminderSent = row[19];
     const statusLower = (status || "").toLowerCase().trim();
-    const shouldSkip = statusLower === "cancelled" || statusLower === "pending" || statusLower === "";
-    if (date === tomorrowStr && reminderSent !== "yes" && !shouldSkip && !seen.has(bookingId)) {
+    if (date === tomorrowStr && reminderSent !== "yes" && statusLower === "approved" && !seen.has(bookingId)) {
       seen.add(bookingId);
       results.push({ rowIndex: idx + 2, bookingId, phone, location, package: pkg, paxCount, date, timePref, name });
     }
