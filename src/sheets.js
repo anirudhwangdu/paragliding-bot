@@ -198,7 +198,7 @@ export async function logHandoff(phone) {
     const sheets = getClient();
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Handoffs!A:B",
+      range: "'Handoffs'!A:B",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[new Date().toISOString(), phone]],
