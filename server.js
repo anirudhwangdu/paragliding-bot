@@ -11,13 +11,19 @@ import { refreshMedia } from "./src/mediaCache.js";
 import { getAllBookings, updateBookingField, getConversations } from "./src/sheets.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 // Initialize environment variables
 dotenv.config();
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-app.use("/static", express.static(path.join(__dirname, "public")));
+const publicDir = path.join(__dirname, "public");
+app.use("/static", express.static(publicDir));
+console.log(
+  "[static] serving", publicDir, "->",
+  fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : "FOLDER MISSING"
+);
 app.use(express.json());
 
 function requireAuth(req, res, next) {
