@@ -358,6 +358,8 @@ async function routeInteractive(from, id, session) {
         await sendImageById(from, qrId, `Advance payment: ₹${advance}`);
       } else if (process.env.QR_IMAGE_URL) {
         await sendImage(from, process.env.QR_IMAGE_URL, `Advance payment: ₹${advance}`);
+      } else {
+        throw new Error("No QR available to send");
       }
     } catch (e) {
       console.error("QR send failed:", errMsg(e));

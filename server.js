@@ -17,13 +17,7 @@ import fs from "fs";
 dotenv.config();
 
 const app = express();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.join(__dirname, "public");
-app.use("/static", express.static(publicDir));
-console.log(
-  "[static] serving", publicDir, "->",
-  fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : "FOLDER MISSING"
-);
+app.use("/public", express.static("public"));
 app.use(express.json());
 
 function requireAuth(req, res, next) {
