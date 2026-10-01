@@ -3,24 +3,40 @@ import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
 import { nanoid } from "nanoid";
-import { sendText, sendButtons, sendList, sendVideo, sendVideoById, sendImage, sendImageById, sendTemplate } from "./whatsappClient.js";
+import {
+  sendText,
+  sendButtons,
+  sendList,
+  sendVideo,
+  sendVideoById,
+  sendImage,
+  sendImageById,
+  sendTemplate,
+  errMsg,
+} from "./whatsappClient.js";
 import { getMediaId } from "./mediaCache.js";
 
-function requireAuth(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith("Basic ")) {
-    res.set("WWW-Authenticate", 'Basic realm="Dashboard"');
-    return res.status(401).send("Authentication required");
+const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
+
+/* -------------------------------------------------------------------------- */
+/*  Team alerts                                                                */
+/* -------------------------------------------------------------------------- */
+
+// Template alert to the team. Never throws, always logs the real Meta error.
+function notifyTeamTemplate(templateName, text) {
+  const to = process.env.HUMAN_HANDOFF_NUMBER;
+  if (!to) {
+    console.warn(`[ALERT] HUMAN_HANDOFF_NUMBER is not set, skipping "${templateName}"`);
+    return Promise.resolve();
   }
-  const [user, pass] = Buffer.from(auth.split(" ")[1], "base64").toString().split(":");
-  if (user === process.env.DASHBOARD_USER && pass === process.env.DASHBOARD_PASSWORD) {
-    return next();
-  }
-  res.set("WWW-Authenticate", 'Basic realm="Dashboard"');
-  return res.status(401).send("Invalid credentials");
+  return sendTemplate(to, templateName, "en", [
+    { type: "body", parameters: [{ type: "text", text }] },
+  ]).catch((e) => console.error(`[ALERT] "${templateName}" failed:`, errMsg(e)));
 }
 
-const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
+/* -------------------------------------------------------------------------- */
+/*  Entry point                                                                */
+/* -------------------------------------------------------------------------- */
 
 export async function handleIncomingMessage(from, message) {
   const text = extractText(message).trim();
@@ -33,6 +49,8 @@ export async function handleIncomingMessage(from, message) {
 
   const isNewSession = !hasSession(from);
   const session = getSession(from);
+  session.draft = session.draft || {};
+
   const isGreeting = ["hi", "hello", "hey", "start"].includes(lower);
   const isMenu = lower === "menu";
 
@@ -47,7 +65,7 @@ export async function handleIncomingMessage(from, message) {
   }
 
   if (isGreeting) {
-    if (isNewSession || !session.draft?.locationKey) {
+    if (isNewSession || !session.draft.locationKey) {
       session.step = "AWAITING_INITIAL_LOCATION";
       await saveSession(from, session);
       await sendButtons(from, "👋 Welcome! Which location are you interested in?", [
@@ -58,7 +76,7 @@ export async function handleIncomingMessage(from, message) {
     }
     session.step = "IDLE";
     await saveSession(from, session);
-    await sendWelcome(from, session.draft?.location);
+    await sendWelcome(from, session.draft.location);
     return;
   }
 
@@ -72,17 +90,29 @@ export async function handleIncomingMessage(from, message) {
   await routeFreeText(from, text, session);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Menus                                                                      */
+/* -------------------------------------------------------------------------- */
+
 async function sendWelcome(to, locationLabel) {
   const videoId = getMediaId("video");
-  if (videoId) {
-    await sendVideoById(to, videoId, "See what flying with us feels like! 🪂");
-  } else if (process.env.WELCOME_VIDEO_URL) {
-    await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
+  try {
+    if (videoId) {
+      await sendVideoById(to, videoId, "See what flying with us feels like! 🪂");
+    } else if (process.env.WELCOME_VIDEO_URL) {
+      await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
+    }
+  } catch (e) {
+    // A broken video must not stop the welcome text and menu
+    console.error("Welcome video failed:", errMsg(e));
   }
   const locationNote = locationLabel
     ? `\n\n📍 Currently set to *${locationLabel}*. Want a different location? Just type "menu".`
     : "";
-  await sendText(to, `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️${locationNote}`);
+  await sendText(
+    to,
+    `👋 Welcome to *${process.env.BUSINESS_NAME}*!\n\nThanks for reaching out — we're excited to help you take flight. ✈️${locationNote}`
+  );
   await sendMainMenu(to);
 }
 
@@ -117,8 +147,12 @@ async function sendPackageList(to, locationKey) {
 
 async function askPassengerDetails(to, session) {
   const total = session.draft.passengerCount;
-  const formUrl = `https://paragliding-bot.onrender.com/passenger-form?to=${to}&total=${total}`;
-  await sendText(to, `Please fill in your ${total > 1 ? total + " passengers'" : "passenger's"} details:\n${formUrl}`);
+  const baseUrl = process.env.PUBLIC_BASE_URL || "https://paragliding-bot.onrender.com";
+  const formUrl = `${baseUrl}/passenger-form?to=${to}&total=${total}`;
+  await sendText(
+    to,
+    `Please fill in your ${total > 1 ? total + " passengers'" : "passenger's"} details:\n${formUrl}`
+  );
 }
 
 function buildConfirmMessage(d) {
@@ -136,6 +170,10 @@ function buildConfirmMessage(d) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Interactive routing                                                        */
+/* -------------------------------------------------------------------------- */
+
 async function routeInteractive(from, id, session) {
   if (id === "greet_bangalore" || id === "greet_alleppey") {
     const key = id === "greet_bangalore" ? "bangalore" : "alleppey";
@@ -143,18 +181,15 @@ async function routeInteractive(from, id, session) {
     session.step = "IDLE";
     await saveSession(from, session);
 
-    if (process.env.HUMAN_HANDOFF_NUMBER) {
-      sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "new_chat_alert", "en", [
-        { type: "body", parameters: [{ type: "text", text: `${from} (${LOCATIONS[key].label})` }] },
-      ]).catch((e) => console.error("New chat notification failed:", e.message));
-    }
+    // Fire and forget; notifyTeamTemplate logs its own errors
+    notifyTeamTemplate("new_chat_alert", `${from} (${LOCATIONS[key].label})`);
 
     await sendWelcome(from);
     return;
   }
 
   if (id === "menu_book") {
-    if (session.draft?.locationKey) {
+    if (session.draft.locationKey) {
       session.step = "CHOOSE_PACKAGE";
       await saveSession(from, session);
       await sendPackageList(from, session.draft.locationKey);
@@ -215,6 +250,10 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "pkg_other") {
+    if (!session.draft.locationKey) {
+      await sendMainMenu(from);
+      return;
+    }
     session.step = "CHOOSE_PACKAGE";
     await saveSession(from, session);
     await sendPackageList(from, session.draft.locationKey);
@@ -232,7 +271,14 @@ async function routeInteractive(from, id, session) {
 
   if (id.startsWith("email_")) {
     const idx = parseInt(id.replace("email_", ""), 10);
-    session.draft.email = session.draft.passengerList[idx].email;
+    const chosen = session.draft.passengerList?.[idx];
+    if (!chosen) {
+      await sendText(from, "That choice has expired. Let's start over.");
+      await resetSession(from);
+      await sendMainMenu(from);
+      return;
+    }
+    session.draft.email = chosen.email;
     session.step = "CONFIRM";
     await saveSession(from, session);
     await sendButtons(from, buildConfirmMessage(session.draft), [
@@ -242,36 +288,60 @@ async function routeInteractive(from, id, session) {
     return;
   }
 
-    if (id === "confirm_yes") {
-    const bookingId = await getNextBookingId();
-    const customerRef = "SKY-" + nanoid(6).toUpperCase();
-    const chosenPkg = findPackage(session.draft.selectedPackageId);
-    if (!chosenPkg) {
-      await sendText(from, "Something went wrong with your package selection. Let's start over.");
+  if (id === "confirm_no") {
+    await resetSession(from);
+    await sendText(from, "No problem, your booking has been cancelled. 🙏");
+    await sendMainMenu(from);
+    return;
+  }
+
+  if (id === "confirm_yes") {
+    const d = { ...session.draft };
+    const chosenPkg = findPackage(d.selectedPackageId);
+
+    // Covers expired sessions and double taps on the Confirm button
+    if (!chosenPkg || !d.passengerList?.length || !d.date) {
+      await sendText(
+        from,
+        "We couldn't find an active booking (it may already be submitted or expired). Let's start over."
+      );
       await resetSession(from);
       await sendMainMenu(from);
       return;
     }
-    const totalPrice = chosenPkg.unit === "person"
-      ? chosenPkg.priceValue * session.draft.passengerCount
-      : chosenPkg.priceValue;
-    const advance = 1000 * session.draft.passengerCount;
+
+    const bookingId = await getNextBookingId();
+    const customerRef = "SKY-" + nanoid(6).toUpperCase();
+    const totalPrice =
+      chosenPkg.unit === "person" ? chosenPkg.priceValue * d.passengerCount : chosenPkg.priceValue;
+    const advance = 1000 * d.passengerCount;
     const balance = totalPrice - advance;
+
     const booking = {
       id: bookingId,
       customerRef,
       phone: from,
       advance,
       balance,
-      ...session.draft,
+      ...d,
       status: "pending_confirmation_call",
       createdAt: new Date().toISOString(),
     };
+
     await saveBooking(booking);
-    await appendBookingToSheet(booking);
+    // Reset right after saving so nothing below can leave the session stuck or allow a duplicate booking
+    await resetSession(from);
+
+    try {
+      await appendBookingToSheet(booking);
+    } catch (e) {
+      console.error("Sheet append failed (booking is saved in DB):", errMsg(e));
+    }
+
     const paxSummary = booking.passengerList
       .map((p, i) => `  ${i + 1}. ${p.name}, age ${p.age}, ${p.weight}kg`)
       .join("\n");
+
     await sendText(
       from,
       `✅ Booking received! Reference: *${booking.customerRef}*\n\n` +
@@ -281,30 +351,53 @@ async function routeInteractive(from, id, session) {
         `Please pay the advance of ₹${advance} using the QR code below. ` +
         `Once received, we'll confirm your slot.`
     );
-    const qrId = getMediaId("qr");
-    if (qrId) {
-      await sendImageById(from, qrId, `Advance payment: ₹${advance}`);
-    } else if (process.env.QR_IMAGE_URL) {
-      await sendImage(from, process.env.QR_IMAGE_URL, `Advance payment: ₹${advance}`);
+
+    try {
+      const qrId = getMediaId("qr");
+      if (qrId) {
+        await sendImageById(from, qrId, `Advance payment: ₹${advance}`);
+      } else if (process.env.QR_IMAGE_URL) {
+        await sendImage(from, process.env.QR_IMAGE_URL, `Advance payment: ₹${advance}`);
+      }
+    } catch (e) {
+      console.error("QR send failed:", errMsg(e));
+      await sendText(from, "We couldn't load the QR code. Our team will share payment details with you shortly.");
     }
+
+    // Free-form text only delivers if the team number messaged the bot in the last 24h.
+    // Consider converting this to a template (e.g. "new_booking_alert") like the other two alerts.
     if (process.env.HUMAN_HANDOFF_NUMBER) {
-      await sendText(
-        process.env.HUMAN_HANDOFF_NUMBER,
-        `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
-          `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
-          `Date: ${booking.date} · ${booking.timePreference}\n` +
-          `Phone: ${booking.phone} · Email: ${booking.email}`
-      );
+      try {
+        await sendText(
+          process.env.HUMAN_HANDOFF_NUMBER,
+          `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
+            `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
+            `Date: ${booking.date} · ${booking.timePreference}\n` +
+            `Phone: ${booking.phone} · Email: ${booking.email}`
+        );
+      } catch (e) {
+        console.error("[ALERT] Booking alert to team failed:", errMsg(e));
+      }
+    } else {
+      console.warn("[ALERT] HUMAN_HANDOFF_NUMBER is not set, skipping booking alert");
     }
-    await resetSession(from);
     return;
   }
 
   await sendMainMenu(from);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Free text routing                                                          */
+/* -------------------------------------------------------------------------- */
+
 async function routeFreeText(from, text, session) {
   switch (session.step) {
+    case "HUMAN":
+      // A person from the team is handling this chat, so the bot stays quiet.
+      // Customer can type "menu" or "hi" to bring the bot back.
+      return;
+
     case "ASK_PASSENGERS": {
       const count = parseInt(text, 10);
       if (isNaN(count) || count < 1) {
@@ -326,25 +419,36 @@ async function routeFreeText(from, text, session) {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Passenger form submission                                                  */
+/* -------------------------------------------------------------------------- */
+
 export async function handleBulkFormSubmission({ phone, passengers, date }) {
   const session = getSession(phone);
+  session.draft = session.draft || {};
   const maxWeight = parseInt(process.env.MAX_RIDER_WEIGHT_KG || "110", 10);
 
-  // Save the date selected by the customer in the passenger form
-  if (date) {
-    session.draft.date = date;
+  if (!session.draft.package) {
+    await sendText(phone, "Your session has expired. Please type \"menu\" to start again.");
+    return;
   }
+
+  // Rebuild the list each time so a re-submitted form doesn't create duplicates
+  session.draft.passengerList = [];
+  session.draft.date = date;
+
   for (const p of passengers) {
     const w = parseInt(p.weight, 10);
     if (isNaN(w) || w > maxWeight) {
-      await sendText(phone, `One passenger's weight (${p.weight}kg) exceeds our ${maxWeight}kg safety limit. Reply "human" to discuss options.`);
+      await sendText(
+        phone,
+        `One passenger's weight (${p.weight}kg) exceeds our ${maxWeight}kg safety limit. Reply "human" to discuss options.`
+      );
       await resetSession(phone);
       return;
     }
     session.draft.passengerList.push({ name: p.name, age: p.age, weight: w, email: p.email });
   }
-
-  session.draft.date = date;
 
   if (session.draft.passengerList.length === 1) {
     session.draft.email = session.draft.passengerList[0].email;
@@ -369,19 +473,28 @@ export async function handleBulkFormSubmission({ phone, passengers, date }) {
   ]);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Human handoff                                                              */
+/* -------------------------------------------------------------------------- */
+
 async function handOffToHuman(to) {
+  const session = getSession(to);
+  session.draft = session.draft || {};
+  session.step = "HUMAN";
+  await saveSession(to, session);
+
   await sendText(
     to,
     "🙋 Connecting you with our team — someone will reply here shortly. " +
       "For urgent safety issues, please call us directly."
   );
-  logHandoff(to).catch((e) => console.error("Handoff logging failed:", e.message));
-  if (process.env.HUMAN_HANDOFF_NUMBER) {
-    sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, "handoff_alert", "en", [
-      { type: "body", parameters: [{ type: "text", text: to }] },
-    ]).catch((e) => console.error("Handoff template failed:", e.message));
-  }
+  logHandoff(to).catch((e) => console.error("Handoff logging failed:", errMsg(e)));
+  notifyTeamTemplate("handoff_alert", to);
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function extractText(message) {
   if (message.type === "text") return message.text.body;
