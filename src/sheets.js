@@ -139,6 +139,7 @@ export async function getAllBookings() {
         price: row[map["Price"]],
         passengerCount: row[map["Passenger Count"]],
         date: row[map["Date"]],
+        createdAt: row[map["Created At"]],
         timePreference: row[map["Time Preference"]],
         confirmationEmail: row[map["Confirmation Email"]],
         customerRef: row[map["Customer Reference"]],

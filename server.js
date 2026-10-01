@@ -662,7 +662,8 @@ select,input{padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;
 <div class="controls">
   <select id="fLocation"><option value="">All Locations</option><option>Bangalore</option><option>Alleppey</option></select>
   <select id="fStatus"><option value="">All Statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="complete">Complete</option><option value="cancelled">Cancelled</option></select>
-  <input type="date" id="fDate">
+  <label style="font-size:13px;align-self:center;">Flying on <input type="date" id="fDate"></label>
+  <label style="font-size:13px;align-self:center;">Booked on <input type="date" id="fBookedDate"></label>
 </div>
 <div class="list" id="list">Loading...</div>
 
@@ -682,10 +683,12 @@ function render() {
   const loc = document.getElementById('fLocation').value;
   const status = document.getElementById('fStatus').value;
   const date = document.getElementById('fDate').value;
+  const bookedDate = document.getElementById('fBookedDate').value;
   const filtered = bookings.filter(b =>
     (!loc || b.location === loc) &&
     (!status || b.status === status) &&
-    (!date || b.date === date)
+    (!date || b.date === date) &&
+    (!bookedDate || (b.createdAt && b.createdAt.startsWith(bookedDate)))
   );
   document.getElementById('list').innerHTML = filtered.map(b => \`
     <div class="card" onclick='openDetail(\${JSON.stringify(b.bookingId)})'>
@@ -776,6 +779,7 @@ async function sendReply(phone) {
 document.getElementById('fLocation').addEventListener('change', render);
 document.getElementById('fStatus').addEventListener('change', render);
 document.getElementById('fDate').addEventListener('change', render);
+document.getElementById('fBookedDate').addEventListener('change', render);
 
 load();
 </script>
