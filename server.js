@@ -9,11 +9,15 @@ import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversat
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
 import { refreshMedia } from "./src/mediaCache.js";
 import { getAllBookings, updateBookingField, getConversations } from "./src/sheets.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Initialize environment variables
 dotenv.config();
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use("/static", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 function requireAuth(req, res, next) {
