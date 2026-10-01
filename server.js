@@ -72,11 +72,21 @@ app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 
   try {
-    const entry = req.body.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
-    const message = value?.messages?.[0];
+    const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
+    // Delivery receipts for messages WE sent
+    const staff = (process.env.HUMAN_HANDOFF_NUMBER || "").replace(/\D/g, "");
+    for (const s of value?.statuses || []) {
+      if (s.status === "failed" || s.recipient_id === staff) {
+        console.log(
+          "[WA status]", s.status, s.recipient_id,
+          "category:", s.pricing?.category || "-",
+          JSON.stringify(s.errors || "")
+        );
+      }
+    }
+
+    const message = value?.messages?.[0];
     if (!message) return;
 
     const from = message.from;
