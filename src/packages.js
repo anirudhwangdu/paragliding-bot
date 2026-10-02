@@ -1,6 +1,12 @@
 export const LOCATIONS = {
   bangalore: {
     label: "Bangalore",
+    categories: [
+      { id: "cat_premium", title: "Premium Packages", description: "Scenic, thriller, sunset & couple flights" },
+      { id: "cat_classic", title: "Classic Packages", description: "Intro, thriller, birthday, pet & duo flights" },
+      { id: "cat_corporate", title: "Corporate Package", description: "Groups of 15–70 · From ₹5,500/person" },
+      { id: "cat_camping", title: "Camping Package", description: "Stay + flights + campfire · From ₹15,000" },
+    ],
     sections: [
       {
         title: "Premium Packages",
@@ -49,6 +55,25 @@ export const LOCATIONS = {
     ],
   },
 };
+
+export const CORPORATE_DETAILS =
+  "🏢 *Corporate Package*\nGroups of 15–70\n\n" +
+  "An offsite your team will still talk about next year. We run corporate flying days built around your headcount, timing and budget — briefings, safety and equipment all handled.\n\n" +
+  "*Group Rates* (per person + 18% GST)\n" +
+  "• 70 guests (flagship): ₹5,500\n" +
+  "• 40–70 guests: ₹6,000\n" +
+  "• 15–30 guests: ₹6,500\n\n" +
+  "Flagship rate includes: 7 min thriller flight, event goodies, snacks, high-quality Insta360 X video.\n\n" +
+  "*Add-ons:* Grill night, breakfast, sunrise temple trail (Nandi Hills), extra flight time.";
+
+export const CAMPING_DETAILS =
+  "🏕️ *Camping Package*\nStay + Flights + Campfire\n\n" +
+  "Arrive afternoon, fly at golden hour, campfire under the stars, sunrise flight at dawn, checkout by 10am.\n\n" +
+  "*Packages*\n" +
+  "• The Two of You (2 guests): ₹15,000 — private room, 2 flights, Insta360 X video\n" +
+  "• Bring the Crew (up to 5): ₹35,000 — stay + campfire, 5 thriller flights, Insta360 X video\n" +
+  "• The Full Takeover (up to 15): ₹90,000 — stay + campfire, 15 thriller flights, Insta360 X video\n\n" +
+  "*Add-ons:* Grill night (at cost of meal), Breakfast ₹200/person.";
 
 export function findPackage(id) {
   for (const loc of Object.values(LOCATIONS)) {

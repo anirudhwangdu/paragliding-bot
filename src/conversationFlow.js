@@ -1,6 +1,6 @@
 import { getSession, saveSession, resetSession, saveBooking, hasSession } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
-import { LOCATIONS, findPackage } from "./packages.js";
+import { LOCATIONS, findPackage, CORPORATE_DETAILS, CAMPING_DETAILS } from "./packages.js";
 import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
 import { nanoid } from "nanoid";
 import {
@@ -103,7 +103,6 @@ async function sendWelcome(to, locationLabel) {
       await sendVideo(to, process.env.WELCOME_VIDEO_URL, "See what flying with us feels like! 🪂");
     }
   } catch (e) {
-    // A broken video must not stop the welcome text and menu
     console.error("Welcome video failed:", errMsg(e));
   }
   const locationNote = locationLabel
@@ -145,6 +144,22 @@ async function sendPackageList(to, locationKey) {
   await sendList(to, `${loc.label} packages:`, "View Packages", cleanSections);
 }
 
+async function sendBangaloreCategories(to) {
+  await sendList(to, "What are you looking for?", "View Categories", [
+    { title: "Categories", rows: LOCATIONS.bangalore.categories },
+  ]);
+}
+
+async function sendCategorySection(to, categoryId) {
+  const idx = categoryId === "premium" ? 0 : 1;
+  const section = LOCATIONS.bangalore.sections[idx];
+  const cleanSection = {
+    title: section.title,
+    rows: section.rows.map(({ id, title, description }) => ({ id, title, description })),
+  };
+  await sendList(to, `${section.title}:`, "View Packages", [cleanSection]);
+}
+
 async function askPassengerDetails(to, session) {
   const total = session.draft.passengerCount;
   const baseUrl = process.env.PUBLIC_BASE_URL || "https://paragliding-bot.onrender.com";
@@ -181,7 +196,6 @@ async function routeInteractive(from, id, session) {
     session.step = "IDLE";
     await saveSession(from, session);
 
-    // Fire and forget; notifyTeamTemplate logs its own errors
     notifyTeamTemplate("new_chat_alert", `${from} (${LOCATIONS[key].label})`);
 
     await sendWelcome(from);
@@ -189,18 +203,55 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "menu_book") {
-    if (session.draft.locationKey) {
-      session.step = "CHOOSE_PACKAGE";
-      await saveSession(from, session);
-      await sendPackageList(from, session.draft.locationKey);
-    } else {
+    if (!session.draft.locationKey) {
       await sendButtons(from, "Which location would you like to fly at?", [
         { id: "greet_bangalore", title: "Bangalore" },
         { id: "greet_alleppey", title: "Alleppey" },
       ]);
+      return;
+    }
+    if (session.draft.locationKey === "bangalore") {
+      session.step = "CHOOSE_CATEGORY";
+      await saveSession(from, session);
+      await sendBangaloreCategories(from);
+    } else {
+      session.step = "CHOOSE_PACKAGE";
+      await saveSession(from, session);
+      await sendPackageList(from, session.draft.locationKey);
     }
     return;
   }
+
+  if (id === "cat_premium" || id === "cat_classic") {
+    const categoryId = id === "cat_premium" ? "premium" : "classic";
+    session.draft.categoryId = categoryId;
+    session.step = "CHOOSE_PACKAGE";
+    await saveSession(from, session);
+    await sendCategorySection(from, categoryId);
+    return;
+  }
+
+  if (id === "cat_corporate" || id === "cat_camping") {
+    const details = id === "cat_corporate" ? CORPORATE_DETAILS : CAMPING_DETAILS;
+    await sendButtons(from, details, [
+      { id: "cat_quote", title: "📞 Get a Quote" },
+      { id: "cat_back", title: "🔄 Other Categories" },
+    ]);
+    return;
+  }
+
+  if (id === "cat_quote") {
+    await handOffToHuman(from);
+    return;
+  }
+
+  if (id === "cat_back") {
+    session.step = "CHOOSE_CATEGORY";
+    await saveSession(from, session);
+    await sendBangaloreCategories(from);
+    return;
+  }
+
   if (id === "menu_faq") {
     await sendList(from, "What would you like to know?", "View FAQs", FAQ_MENU_SECTIONS);
     return;
@@ -254,9 +305,13 @@ async function routeInteractive(from, id, session) {
       await sendMainMenu(from);
       return;
     }
-    session.step = "CHOOSE_PACKAGE";
-    await saveSession(from, session);
-    await sendPackageList(from, session.draft.locationKey);
+    if (session.draft.locationKey === "bangalore" && session.draft.categoryId) {
+      await sendCategorySection(from, session.draft.categoryId);
+    } else {
+      session.step = "CHOOSE_PACKAGE";
+      await saveSession(from, session);
+      await sendPackageList(from, session.draft.locationKey);
+    }
     return;
   }
 
@@ -299,7 +354,6 @@ async function routeInteractive(from, id, session) {
     const d = { ...session.draft };
     const chosenPkg = findPackage(d.selectedPackageId);
 
-    // Covers expired sessions and double taps on the Confirm button
     if (!chosenPkg || !d.passengerList?.length || !d.date) {
       await sendText(
         from,
@@ -329,7 +383,6 @@ async function routeInteractive(from, id, session) {
     };
 
     await saveBooking(booking);
-    // Reset right after saving so nothing below can leave the session stuck or allow a duplicate booking
     await resetSession(from);
 
     try {
@@ -366,8 +419,6 @@ async function routeInteractive(from, id, session) {
       await sendText(from, "We couldn't load the QR code. Our team will share payment details with you shortly.");
     }
 
-    // Free-form text only delivers if the team number messaged the bot in the last 24h.
-    // Consider converting this to a template (e.g. "new_booking_alert") like the other two alerts.
     if (process.env.HUMAN_HANDOFF_NUMBER) {
       try {
         await sendText(
@@ -396,8 +447,6 @@ async function routeInteractive(from, id, session) {
 async function routeFreeText(from, text, session) {
   switch (session.step) {
     case "HUMAN":
-      // A person from the team is handling this chat, so the bot stays quiet.
-      // Customer can type "menu" or "hi" to bring the bot back.
       return;
 
     case "ASK_PASSENGERS": {
@@ -435,7 +484,6 @@ export async function handleBulkFormSubmission({ phone, passengers, date }) {
     return;
   }
 
-  // Rebuild the list each time so a re-submitted form doesn't create duplicates
   session.draft.passengerList = [];
   session.draft.date = date;
 
