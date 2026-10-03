@@ -154,66 +154,7 @@ app.post("/quote-form-submit", express.json(), async (req, res) => {
   }
 });
 
-function renderQuoteFormPage(to, type, botNumber) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${type} Quote Request</title>
-<style>
-body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
-h2{color:#1a3c6e;}
-input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
-button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
-button:disabled{opacity:0.6;}
-#thankyou{display:none;text-align:center;}
-</style>
-</head>
-<body>
-<div id="formWrap">
-<h2>${type} Package — Quote Request</h2>
-<form id="quoteForm">
-  <input type="text" id="name" placeholder="Full Name" required>
-  <input type="number" id="guests" placeholder="Number of Guests" required>
-  <input type="date" id="date" required>
-  <input type="email" id="email" placeholder="Email (optional)">
-  <button type="submit" id="submitBtn">Submit</button>
-</form>
-</div>
-<div id="thankyou">
-  <h2>✅ Request sent!</h2>
-  <p>Our team will get back to you shortly. Redirecting you back to WhatsApp...</p>
-  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
-</div>
-<script>
-let isSubmitting = false;
-document.getElementById('quoteForm').addEventListener('submit', async function(e){
-  e.preventDefault();
-  if (isSubmitting) return;
-  isSubmitting = true;
-  document.getElementById('submitBtn').disabled = true;
 
-  const body = {
-    phone: "${to}",
-    packageType: "${type}",
-    name: document.getElementById('name').value,
-    guests: document.getElementById('guests').value,
-    date: document.getElementById('date').value,
-    email: document.getElementById('email').value,
-  };
-  await fetch('/quote-form-submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  });
-  document.getElementById('formWrap').style.display = 'none';
-  document.getElementById('thankyou').style.display = 'block';
-  window.location.href = "https://wa.me/${botNumber}";
-});
-</script>
-</body>
-</html>`;
-}
 
 function renderFormPage(to, total, botNumber) {
   return `<!DOCTYPE html>
