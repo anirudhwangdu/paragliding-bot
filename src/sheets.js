@@ -215,7 +215,7 @@ export async function logQuoteRequest(data) {
     const sheets = getClient();
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'Quote Requests'!A:G",
+      range: "'Quote Requests'!A:F",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[
@@ -225,7 +225,6 @@ export async function logQuoteRequest(data) {
           data.date,
           data.name,
           data.phone,
-          data.email,
         ]],
       },
     });
