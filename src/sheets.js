@@ -209,3 +209,27 @@ export async function logHandoff(phone) {
     console.error("Failed to log handoff:", err.response?.data || err.message);
   }
 }
+
+export async function logQuoteRequest(data) {
+  try {
+    const sheets = getClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "'Quote Requests'!A:G",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[
+          new Date().toISOString(),
+          data.packageType,
+          data.guests,
+          data.date,
+          data.name,
+          data.phone,
+          data.email,
+        ]],
+      },
+    });
+  } catch (err) {
+    console.error("Failed to log quote request:", err.response?.data || err.message);
+  }
+}

@@ -22,7 +22,6 @@ const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "
 /*  Team alerts                                                                */
 /* -------------------------------------------------------------------------- */
 
-// Template alert to the team. Never throws, always logs the real Meta error.
 function notifyTeamTemplate(templateName, text) {
   const to = process.env.HUMAN_HANDOFF_NUMBER;
   if (!to) {
@@ -232,6 +231,8 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "cat_corporate" || id === "cat_camping") {
+    session.draft.quoteType = id === "cat_corporate" ? "Corporate" : "Camping";
+    await saveSession(from, session);
     const details = id === "cat_corporate" ? CORPORATE_DETAILS : CAMPING_DETAILS;
     await sendButtons(from, details, [
       { id: "cat_quote", title: "📞 Get a Quote" },
@@ -241,7 +242,9 @@ async function routeInteractive(from, id, session) {
   }
 
   if (id === "cat_quote") {
-    await handOffToHuman(from);
+    const baseUrl = process.env.PUBLIC_BASE_URL || "https://paragliding-bot.onrender.com";
+    const formUrl = `${baseUrl}/quote-form?to=${from}&type=${encodeURIComponent(session.draft.quoteType || "Corporate")}`;
+    await sendText(from, `Please fill in a few quick details and our team will follow up with a quote:\n${formUrl}`);
     return;
   }
 

@@ -2,16 +2,13 @@ import express from "express";
 import dotenv from "dotenv";
 import cron from "node-cron";
 import axios from "axios";
-import { sendTemplate,markRead } from "./src/whatsappClient.js";
+import { sendText,sendTemplate,markRead } from "./src/whatsappClient.js";
 import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
 import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
 import { refreshMedia } from "./src/mediaCache.js";
-import { getAllBookings, updateBookingField, getConversations } from "./src/sheets.js";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import { getAllBookings, updateBookingField, getConversations, logQuoteRequest } from "./src/sheets.js";
 
 // Initialize environment variables
 dotenv.config();
@@ -129,6 +126,94 @@ app.post("/passenger-form-submit", express.json(), async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
+
+app.get("/quote-form", (req, res) => {
+  const to = req.query.to || "";
+  const type = req.query.type || "Corporate";
+  const botNumber = process.env.WHATSAPP_BOT_NUMBER || "";
+  res.send(renderQuoteFormPage(to, type, botNumber));
+});
+
+app.post("/quote-form-submit", express.json(), async (req, res) => {
+  try {
+    const { phone, packageType, guests, date, name, email } = req.body;
+    await logQuoteRequest({ packageType, guests, date, name, phone, email });
+
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      await sendText(
+        process.env.HUMAN_HANDOFF_NUMBER,
+        `💼 Quote request — ${packageType} Package\n` +
+          `Name: ${name}\nGuests: ${guests}\nDate: ${date}\n` +
+          `Phone: ${phone}\nEmail: ${email || "-"}`
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Quote form submit error:", err.message);
+    res.status(500).json({ success: false });
+  }
+});
+
+function renderQuoteFormPage(to, type, botNumber) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${type} Quote Request</title>
+<style>
+body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
+h2{color:#1a3c6e;}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
+button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+button:disabled{opacity:0.6;}
+#thankyou{display:none;text-align:center;}
+</style>
+</head>
+<body>
+<div id="formWrap">
+<h2>${type} Package — Quote Request</h2>
+<form id="quoteForm">
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="number" id="guests" placeholder="Number of Guests" required>
+  <input type="date" id="date" required>
+  <input type="email" id="email" placeholder="Email (optional)">
+  <button type="submit" id="submitBtn">Submit</button>
+</form>
+</div>
+<div id="thankyou">
+  <h2>✅ Request sent!</h2>
+  <p>Our team will get back to you shortly. Redirecting you back to WhatsApp...</p>
+  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
+</div>
+<script>
+let isSubmitting = false;
+document.getElementById('quoteForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
+  document.getElementById('submitBtn').disabled = true;
+
+  const body = {
+    phone: "${to}",
+    packageType: "${type}",
+    name: document.getElementById('name').value,
+    guests: document.getElementById('guests').value,
+    date: document.getElementById('date').value,
+    email: document.getElementById('email').value,
+  };
+  await fetch('/quote-form-submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('thankyou').style.display = 'block';
+  window.location.href = "https://wa.me/${botNumber}";
+});
+</script>
+</body>
+</html>`;
+}
 
 function renderFormPage(to, total, botNumber) {
   return `<!DOCTYPE html>
@@ -557,6 +642,94 @@ app.post("/api/booking-action", requireAuth, express.json(), async (req, res) =>
     res.status(500).json({ success: false, error: err.response?.data?.error?.message || err.message });
   }
 });
+
+app.get("/quote-form", (req, res) => {
+  const to = req.query.to || "";
+  const type = req.query.type || "Corporate";
+  const botNumber = process.env.WHATSAPP_BOT_NUMBER || "";
+  res.send(renderQuoteFormPage(to, type, botNumber));
+});
+
+app.post("/quote-form-submit", express.json(), async (req, res) => {
+  try {
+    const { phone, packageType, guests, date, name, email } = req.body;
+    await logQuoteRequest({ packageType, guests, date, name, phone, email });
+
+    if (process.env.HUMAN_HANDOFF_NUMBER) {
+      await sendText(
+        process.env.HUMAN_HANDOFF_NUMBER,
+        `💼 Quote request — ${packageType} Package\n` +
+          `Name: ${name}\nGuests: ${guests}\nDate: ${date}\n` +
+          `Phone: ${phone}\nEmail: ${email || "-"}`
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Quote form submit error:", err.message);
+    res.status(500).json({ success: false });
+  }
+});
+
+function renderQuoteFormPage(to, type, botNumber) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${type} Quote Request</title>
+<style>
+body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
+h2{color:#1a3c6e;}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
+button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+button:disabled{opacity:0.6;}
+#thankyou{display:none;text-align:center;}
+</style>
+</head>
+<body>
+<div id="formWrap">
+<h2>${type} Package — Quote Request</h2>
+<form id="quoteForm">
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="number" id="guests" placeholder="Number of Guests" required>
+  <input type="date" id="date" required>
+  <input type="email" id="email" placeholder="Email (optional)">
+  <button type="submit" id="submitBtn">Submit</button>
+</form>
+</div>
+<div id="thankyou">
+  <h2>✅ Request sent!</h2>
+  <p>Our team will get back to you shortly. Redirecting you back to WhatsApp...</p>
+  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
+</div>
+<script>
+let isSubmitting = false;
+document.getElementById('quoteForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
+  document.getElementById('submitBtn').disabled = true;
+
+  const body = {
+    phone: "${to}",
+    packageType: "${type}",
+    name: document.getElementById('name').value,
+    guests: document.getElementById('guests').value,
+    date: document.getElementById('date').value,
+    email: document.getElementById('email').value,
+  };
+  await fetch('/quote-form-submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('thankyou').style.display = 'block';
+  window.location.href = "https://wa.me/${botNumber}";
+});
+</script>
+</body>
+</html>`;
+}
 
 // Start Server
 app.listen(PORT, () => {
