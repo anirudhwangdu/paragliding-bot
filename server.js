@@ -2,15 +2,17 @@ import express from "express";
 import dotenv from "dotenv";
 import cron from "node-cron";
 import axios from "axios";
-import { sendText,sendTemplate,markRead } from "./src/whatsappClient.js";
+import { sendText, sendTemplate, markRead } from "./src/whatsappClient.js";
 import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
-import { getBookingsNeedingReminder, markReminderSent } from "./src/sheets.js";
+import {
+  getBookingsNeedingReminder,
+  markReminderSent 
+} from "./src/sheets.js";
 import { refreshMedia } from "./src/mediaCache.js";
 import { getAllBookings, updateBookingField, getConversations, logQuoteRequest } from "./src/sheets.js";
 
-// Initialize environment variables
 dotenv.config();
 
 const app = express();
@@ -27,10 +29,7 @@ function requireAuth(req, res, next) {
     const user = decoded.slice(0, idx);
     const pass = decoded.slice(idx + 1);
 
-    if (
-      user === process.env.DASHBOARD_USER &&
-      pass === process.env.DASHBOARD_PASSWORD
-    ) {
+    if (user === process.env.DASHBOARD_USER && pass === process.env.DASHBOARD_PASSWORD) {
       return next();
     }
   }
@@ -42,10 +41,8 @@ function requireAuth(req, res, next) {
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
-// 1. Health Check Endpoint
 app.get("/health", (req, res) => res.status(200).send("OK"));
 
-// 2. Keep-Alive Cron Schedule (Every 10 minutes)
 cron.schedule("*/10 * * * *", async () => {
   try {
     await axios.get(`${RENDER_URL}/health`);
@@ -55,7 +52,6 @@ cron.schedule("*/10 * * * *", async () => {
   }
 });
 
-// Webhook Verification
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -68,14 +64,12 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
-// Incoming Webhook Messages
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 
   try {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
-    // Delivery receipts for messages WE sent
     const staff = (process.env.HUMAN_HANDOFF_NUMBER || "").replace(/\D/g, "");
     for (const s of value?.statuses || []) {
       if (s.status === "failed" || s.recipient_id === staff) {
@@ -102,14 +96,16 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// Bookings & Admin Endpoints
 app.get("/bookings", (req, res) => {
   res.json(listBookings());
 });
 
 app.get("/", (req, res) => res.send("Paragliding WhatsApp bot is running."));
 
-// Passenger Form Endpoints
+/* -------------------------------------------------------------------------- */
+/*  Passenger form                                                             */
+/* -------------------------------------------------------------------------- */
+
 app.get("/passenger-form", (req, res) => {
   const to = req.query.to || "";
   const total = req.query.total || "1";
@@ -127,6 +123,107 @@ app.post("/passenger-form-submit", express.json(), async (req, res) => {
   }
 });
 
+function renderFormPage(to, total, botNumber) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Passenger Details</title>
+<style>
+body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
+h2{color:#1a3c6e;}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
+#dateField label{display:block;font-size:16px;font-weight:600;color:#333;margin:8px 0 6px;}
+button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+button:disabled{opacity:0.6;}
+#dateField{display:block;}
+#thankyou{display:none;text-align:center;}
+</style>
+</head>
+<body>
+<div id="formWrap">
+<h2 id="heading">Passenger 1 of ${total}</h2>
+<form id="paxForm">
+  <div id="dateField">
+    <label for="flightDate">📅 Select Flight Date</label>
+    <input type="date" id="flightDate" required>
+  </div>
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="number" id="age" placeholder="Age" required>
+  <input type="number" id="weight" placeholder="Weight (kg)" required>
+  <input type="email" id="email" placeholder="Email address" required>
+  <button type="submit" id="submitBtn">${total > 1 ? "Next" : "Submit"}</button>
+</form>
+</div>
+<div id="thankyou">
+  <h2>✅ Details saved!</h2>
+  <p>Redirecting you back to WhatsApp...</p>
+  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
+</div>
+<script>
+const total = ${total};
+let current = 1;
+let isSubmitting = false;
+const passengers = [];
+let flightDate = '';
+
+document.getElementById('paxForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
+  document.getElementById('submitBtn').disabled = true;
+
+  if (current === 1) {
+    flightDate = document.getElementById('flightDate').value;
+  }
+
+  const name = document.getElementById('name').value;
+  const age = document.getElementById('age').value;
+  const weight = document.getElementById('weight').value;
+  const email = document.getElementById('email').value;
+  passengers.push({ name, age, weight, email });
+
+  if (current < total) {
+    current++;
+    document.getElementById('heading').textContent = 'Passenger ' + current + ' of ' + total;
+    document.getElementById('dateField').style.display = 'none';
+    document.getElementById('name').value = '';
+    document.getElementById('age').value = '';
+    document.getElementById('weight').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('submitBtn').textContent = current < total ? 'Next' : 'Submit';
+    document.getElementById('submitBtn').disabled = false;
+    isSubmitting = false;
+    return;
+  }
+
+  try {
+    const response = await fetch('/passenger-form-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: "${to}", passengers: passengers, date: flightDate })
+    });
+    if (!response.ok) throw new Error('Failed to save passenger details');
+
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('thankyou').style.display = 'block';
+    setTimeout(() => { window.location.href = "https://wa.me/${botNumber}"; }, 1000);
+  } catch (error) {
+    console.error(error);
+    alert('Unable to save the details. Please try again.');
+    document.getElementById('submitBtn').disabled = false;
+    isSubmitting = false;
+  }
+});
+</script>
+</body>
+</html>`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Corporate / Camping quote form                                             */
+/* -------------------------------------------------------------------------- */
+
 app.get("/quote-form", (req, res) => {
   const to = req.query.to || "";
   const type = req.query.type || "Corporate";
@@ -136,15 +233,15 @@ app.get("/quote-form", (req, res) => {
 
 app.post("/quote-form-submit", express.json(), async (req, res) => {
   try {
-    const { phone, packageType, guests, date, name, email } = req.body;
-    await logQuoteRequest({ packageType, guests, date, name, phone, email });
+    const { phone, packageType, guests, date, name } = req.body;
+    await logQuoteRequest({ packageType, guests, date, name, phone });
 
     if (process.env.HUMAN_HANDOFF_NUMBER) {
       await sendText(
         process.env.HUMAN_HANDOFF_NUMBER,
         `💼 Quote request — ${packageType} Package\n` +
           `Name: ${name}\nGuests: ${guests}\nDate: ${date}\n` +
-          `Phone: ${phone}\nEmail: ${email || "-"}`
+          `Phone: ${phone}`
       );
     }
     res.json({ success: true });
@@ -154,224 +251,111 @@ app.post("/quote-form-submit", express.json(), async (req, res) => {
   }
 });
 
-
-
-function renderFormPage(to, total, botNumber) {
+function renderQuoteFormPage(to, type, botNumber) {
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Passenger Details</title>
-
+<title>${type} Quote Request</title>
 <style>
-body{
-  font-family:sans-serif;
-  padding:20px;
-  background:#f7f7f7;
-}
-
-h2{
-  color:#1a3c6e;
-}
-
-input{
-  width:100%;
-  padding:12px;
-  margin:8px 0;
-  border:1px solid #ccc;
-  border-radius:8px;
-  font-size:16px;
-  box-sizing:border-box;
-}
-
-#dateField label{
-  display:block;
-  font-size:16px;
-  font-weight:600;
-  color:#333;
-  margin:8px 0 6px;
-}
-
-button,
-a.btn{
-  display:block;
-  width:100%;
-  padding:14px;
-  background:#1a3c6e;
-  color:white;
-  border:none;
-  border-radius:8px;
-  font-size:16px;
-  margin-top:10px;
-  text-align:center;
-  text-decoration:none;
-  box-sizing:border-box;
-}
-
-button:disabled{
-  opacity:0.6;
-}
-
-#dateField{
-  display:block;
-}
-
-#thankyou{
-  display:none;
-  text-align:center;
-}
+body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
+h2{color:#1a3c6e;}
+label{display:block;font-size:14px;font-weight:600;color:#333;margin:10px 0 4px;}
+input{width:100%;padding:12px;margin-bottom:6px;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
+button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
+button:disabled{opacity:0.6;}
+.back-link{display:block;text-align:center;margin-top:10px;color:#1a3c6e;font-size:14px;}
+#confirmScreen,#thankyou{display:none;}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;}
+.row b{color:#555;}
+#thankyou{text-align:center;}
 </style>
 </head>
-
 <body>
 
 <div id="formWrap">
-  <h2 id="heading">Passenger 1 of ${total}</h2>
+<h2>${type} Package — Quote Request</h2>
+<form id="quoteForm">
+  <label for="name">Full Name</label>
+  <input type="text" id="name" required>
 
-  <form id="paxForm">
+  <label for="guests">Number of Guests</label>
+  <input type="number" id="guests" required>
 
-    <div id="dateField">
-      <label for="flightDate">📅 Select Flight Date</label>
-      <input type="date" id="flightDate" required>
-    </div>
+  <label for="date">Select Date</label>
+  <input type="date" id="date" required>
 
-    <input type="text" id="name" placeholder="Full Name" required>
+  <button type="submit">Review</button>
+</form>
+</div>
 
-    <input type="number" id="age" placeholder="Age" required>
-
-    <input type="number" id="weight" placeholder="Weight (kg)" required>
-
-    <input type="email" id="email" placeholder="Email address" required>
-
-    <button type="submit" id="submitBtn">
-      ${total > 1 ? "Next" : "Submit"}
-    </button>
-
-  </form>
+<div id="confirmScreen">
+  <h2>Confirm your request</h2>
+  <div class="row"><span>Package</span><b id="cfPackage"></b></div>
+  <div class="row"><span>Name</span><b id="cfName"></b></div>
+  <div class="row"><span>Guests</span><b id="cfGuests"></b></div>
+  <div class="row"><span>Date</span><b id="cfDate"></b></div>
+  <button id="confirmBtn">Confirm & Send</button>
+  <a class="back-link" id="backLink" href="#">← Edit details</a>
 </div>
 
 <div id="thankyou">
-  <h2>✅ Details saved!</h2>
-  <p>Redirecting you back to WhatsApp...</p>
-
-  <a class="btn" href="https://wa.me/${botNumber}">
-    Return to Chat
-  </a>
+  <h2>✅ Request sent!</h2>
+  <p>Our team will get back to you shortly. Redirecting you back to WhatsApp...</p>
+  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
 </div>
 
 <script>
-const total = ${total};
-
-let current = 1;
+const type = "${type}";
+const to = "${to}";
 let isSubmitting = false;
+let draft = {};
 
-const passengers = [];
-
-let flightDate = '';
-
-document.getElementById('paxForm').addEventListener('submit', async function(e) {
-
+document.getElementById('quoteForm').addEventListener('submit', function(e){
   e.preventDefault();
+  draft = {
+    name: document.getElementById('name').value,
+    guests: document.getElementById('guests').value,
+    date: document.getElementById('date').value,
+  };
+  document.getElementById('cfPackage').textContent = type;
+  document.getElementById('cfName').textContent = draft.name;
+  document.getElementById('cfGuests').textContent = draft.guests;
+  document.getElementById('cfDate').textContent = draft.date;
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('confirmScreen').style.display = 'block';
+});
 
+document.getElementById('backLink').addEventListener('click', function(e){
+  e.preventDefault();
+  document.getElementById('confirmScreen').style.display = 'none';
+  document.getElementById('formWrap').style.display = 'block';
+});
+
+document.getElementById('confirmBtn').addEventListener('click', async function(){
   if (isSubmitting) return;
-
   isSubmitting = true;
+  this.disabled = true;
 
-  document.getElementById('submitBtn').disabled = true;
-
-  // Get flight date from Passenger 1
-  if (current === 1) {
-    flightDate = document.getElementById('flightDate').value;
-  }
-
-  const name = document.getElementById('name').value;
-  const age = document.getElementById('age').value;
-  const weight = document.getElementById('weight').value;
-  const email = document.getElementById('email').value;
-
-  passengers.push({
-    name,
-    age,
-    weight,
-    email
+  await fetch('/quote-form-submit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ phone: to, packageType: type, ...draft })
   });
 
-  // Move to next passenger
-  if (current < total) {
-
-    current++;
-
-    document.getElementById('heading').textContent =
-      'Passenger ' + current + ' of ' + total;
-
-    // Hide date field after Passenger 1
-    document.getElementById('dateField').style.display = 'none';
-
-    // Clear passenger fields
-    document.getElementById('name').value = '';
-    document.getElementById('age').value = '';
-    document.getElementById('weight').value = '';
-    document.getElementById('email').value = '';
-
-    document.getElementById('submitBtn').textContent =
-      current < total ? 'Next' : 'Submit';
-
-    document.getElementById('submitBtn').disabled = false;
-
-    isSubmitting = false;
-
-    return;
-  }
-
-  // Submit all passenger information
-  try {
-
-    const response = await fetch('/passenger-form-submit', {
-      method: 'POST',
-
-      headers: {
-        'Content-Type': 'application/json'
-      },
-
-      body: JSON.stringify({
-        phone: "${to}",
-        passengers: passengers,
-        date: flightDate
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to save passenger details');
-    }
-
-    // Show success message
-    document.getElementById('formWrap').style.display = 'none';
-    document.getElementById('thankyou').style.display = 'block';
-
-    // Redirect to WhatsApp
-    setTimeout(() => {
-      window.location.href = "https://wa.me/${botNumber}";
-    }, 1000);
-
-  } catch (error) {
-
-    console.error(error);
-
-    alert('Unable to save the details. Please try again.');
-
-    document.getElementById('submitBtn').disabled = false;
-
-    isSubmitting = false;
-  }
-
+  document.getElementById('confirmScreen').style.display = 'none';
+  document.getElementById('thankyou').style.display = 'block';
+  window.location.href = "https://wa.me/${botNumber}";
 });
 </script>
-
 </body>
 </html>`;
 }
 
-// Scheduled Background Task for Flight Reminders
+/* -------------------------------------------------------------------------- */
+/*  Reminder scheduler                                                         */
+/* -------------------------------------------------------------------------- */
+
 async function processReminders() {
   try {
     const bookings = await getBookingsNeedingReminder();
@@ -403,28 +387,19 @@ async function processReminders() {
       }
       await markReminderSent(b.rowIndex);
     }
-   } catch (err) {
+  } catch (err) {
     console.error("Reminder processing failed:", err.response?.data || err.message, err.config?.url || "");
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Booking status webhooks (from Apps Script)                                 */
+/* -------------------------------------------------------------------------- */
+
 app.post("/booking-confirmed", express.json(), async (req, res) => {
   res.sendStatus(200);
-
   try {
-    const {
-      location,
-      phone,
-      email,
-      name,
-      weight,
-      date,
-      timeSlot,
-      package: pkg,
-      passengerCount,
-      advance,
-      balance
-    } = req.body;
+    const { location, phone, email, name, weight, date, timeSlot, package: pkg, passengerCount, advance, balance } = req.body;
 
     const templateName = location.toLowerCase().includes("bangalore")
       ? "booking_confirmed_bangalore"
@@ -439,17 +414,13 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       { type: "text", text: String(passengerCount) },
       { type: "text", text: String(advance) },
       { type: "text", text: String(balance) },
-      { type: "text", text: "89517 71232" }
+      { type: "text", text: "89517 71232" },
     ];
 
-    await sendTemplate(phone, templateName, "en", [
-      { type: "body", parameters: params }
-    ]);
+    await sendTemplate(phone, templateName, "en", [{ type: "body", parameters: params }]);
 
     if (process.env.HUMAN_HANDOFF_NUMBER) {
-      await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, templateName, "en", [
-        { type: "body", parameters: params }
-      ]);
+      await sendTemplate(process.env.HUMAN_HANDOFF_NUMBER, templateName, "en", [{ type: "body", parameters: params }]);
     }
 
     if (email) {
@@ -470,18 +441,51 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
          <p>See you in the sky! ✈️</p>`
       );
     }
-
   } catch (err) {
-    console.error(
-      "Booking confirmation failed:",
-      err.response?.data || err.message
-    );
+    console.error("Booking confirmation failed:", err.response?.data || err.message);
   }
 });
 
-// Run reminder service every hour
+app.post("/booking-cancelled", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { phone, name, package: pkg } = req.body;
+    await sendTemplate(phone, "booking_cancelled", "en", [
+      { type: "body", parameters: [{ type: "text", text: name }, { type: "text", text: pkg }] },
+    ]);
+  } catch (err) {
+    console.error("Cancellation notice failed:", err.response?.data || err.message);
+  }
+});
+
+app.post("/booking-review", express.json(), async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { phone, location } = req.body;
+    const isBangalore = location && location.toLowerCase().includes("bangalore");
+    const templateName = isBangalore ? "review_request_bangalore" : "review_request_alleppey";
+    const reviewLink = isBangalore
+      ? process.env.GOOGLE_REVIEW_LINK_BANGALORE
+      : process.env.GOOGLE_REVIEW_LINK_ALLEPPEY;
+
+    await sendTemplate(phone, templateName, "en", [
+      { type: "body", parameters: [{ type: "text", text: reviewLink }] },
+    ]);
+  } catch (err) {
+    console.error("Review request failed:", err.response?.data || err.message);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Background schedulers                                                      */
+/* -------------------------------------------------------------------------- */
+
 setInterval(processReminders, 60 * 60 * 1000);
-setInterval(refreshMedia, 7 * 24 * 60 * 60 * 1000); // refresh weekly, before the 30-day expiry
+setInterval(refreshMedia, 7 * 24 * 60 * 60 * 1000);
+
+/* -------------------------------------------------------------------------- */
+/*  Staff dashboard                                                             */
+/* -------------------------------------------------------------------------- */
 
 app.get("/dashboard", requireAuth, (req, res) => {
   res.send(renderDashboardPage());
@@ -581,148 +585,6 @@ app.post("/api/booking-action", requireAuth, express.json(), async (req, res) =>
   } catch (err) {
     console.error("Booking action failed:", err.response?.data || err.message);
     res.status(500).json({ success: false, error: err.response?.data?.error?.message || err.message });
-  }
-});
-
-app.get("/quote-form", (req, res) => {
-  const to = req.query.to || "";
-  const type = req.query.type || "Corporate";
-  const botNumber = process.env.WHATSAPP_BOT_NUMBER || "";
-  res.send(renderQuoteFormPage(to, type, botNumber));
-});
-
-app.post("/quote-form-submit", express.json(), async (req, res) => {
-  try {
-    const { phone, packageType, guests, date, name, email } = req.body;
-    await logQuoteRequest({ packageType, guests, date, name, phone, email });
-
-    if (process.env.HUMAN_HANDOFF_NUMBER) {
-      await sendText(
-        process.env.HUMAN_HANDOFF_NUMBER,
-        `💼 Quote request — ${packageType} Package\n` +
-          `Name: ${name}\nGuests: ${guests}\nDate: ${date}\n` +
-          `Phone: ${phone}\nEmail: ${email || "-"}`
-      );
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Quote form submit error:", err.message);
-    res.status(500).json({ success: false });
-  }
-});
-
-function renderQuoteFormPage(to, type, botNumber) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${type} Quote Request</title>
-<style>
-body{font-family:sans-serif;padding:20px;background:#f7f7f7;}
-h2{color:#1a3c6e;}
-input{width:100%;padding:12px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px;box-sizing:border-box;}
-button,a.btn{display:block;width:100%;padding:14px;background:#1a3c6e;color:white;border:none;border-radius:8px;font-size:16px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;}
-button:disabled{opacity:0.6;}
-#thankyou{display:none;text-align:center;}
-</style>
-</head>
-<body>
-<div id="formWrap">
-<h2>${type} Package — Quote Request</h2>
-<form id="quoteForm">
-  <input type="text" id="name" placeholder="Full Name" required>
-  <input type="number" id="guests" placeholder="Number of Guests" required>
-  <input type="date" id="date" required>
-  <input type="email" id="email" placeholder="Email (optional)">
-  <button type="submit" id="submitBtn">Submit</button>
-</form>
-</div>
-<div id="thankyou">
-  <h2>✅ Request sent!</h2>
-  <p>Our team will get back to you shortly. Redirecting you back to WhatsApp...</p>
-  <a class="btn" href="https://wa.me/${botNumber}">Return to Chat</a>
-</div>
-<script>
-let isSubmitting = false;
-document.getElementById('quoteForm').addEventListener('submit', async function(e){
-  e.preventDefault();
-  if (isSubmitting) return;
-  isSubmitting = true;
-  document.getElementById('submitBtn').disabled = true;
-
-  const body = {
-    phone: "${to}",
-    packageType: "${type}",
-    name: document.getElementById('name').value,
-    guests: document.getElementById('guests').value,
-    date: document.getElementById('date').value,
-    email: document.getElementById('email').value,
-  };
-  await fetch('/quote-form-submit', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  });
-  document.getElementById('formWrap').style.display = 'none';
-  document.getElementById('thankyou').style.display = 'block';
-  window.location.href = "https://wa.me/${botNumber}";
-});
-</script>
-</body>
-</html>`;
-}
-
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-  processReminders(); // Run once on startup
-  refreshMedia();     // Upload video + QR to Meta on startup
-});
-app.post("/booking-cancelled", express.json(), async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const { phone, name, package: pkg } = req.body;
-    await sendTemplate(phone, "booking_cancelled", "en", [
-      { type: "body", parameters: [
-        { type: "text", text: name },
-        { type: "text", text: pkg },
-      ]},
-    ]);
-  } catch (err) {
-    console.error("Cancellation notice failed:", err.response?.data || err.message);
-  }
-});
-
-app.post("/timeslot-updated", express.json(), async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const { phone, timeSlot, date } = req.body;
-    await sendTemplate(phone, "timeslot_confirmed", "en", [
-      { type: "body", parameters: [
-        { type: "text", text: timeSlot },
-        { type: "text", text: date },
-      ]},
-    ]);
-  } catch (err) {
-    console.error("Time slot notice failed:", err.response?.data || err.message);
-  }
-});
-
-app.post("/booking-review", express.json(), async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const { phone, location } = req.body;
-    const isBangalore = location && location.toLowerCase().includes("bangalore");
-    const templateName = isBangalore ? "review_request_bangalore" : "review_request_alleppey";
-    const reviewLink = isBangalore
-      ? process.env.GOOGLE_REVIEW_LINK_BANGALORE
-      : process.env.GOOGLE_REVIEW_LINK_ALLEPPEY;
-
-    await sendTemplate(phone, templateName, "en", [
-      { type: "body", parameters: [{ type: "text", text: reviewLink }] },
-    ]);
-  } catch (err) {
-    console.error("Review request failed:", err.response?.data || err.message);
   }
 });
 
@@ -894,3 +756,13 @@ load();
 </body>
 </html>`;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Start server (must be last)                                                */
+/* -------------------------------------------------------------------------- */
+
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+  processReminders();
+  refreshMedia();
+});
