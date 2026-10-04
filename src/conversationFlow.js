@@ -1,7 +1,7 @@
 import { getSession, saveSession, resetSession, saveBooking, hasSession } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage, CORPORATE_DETAILS, CAMPING_DETAILS } from "./packages.js";
-import { appendBookingToSheet, getNextBookingId, logHandoff } from "./sheets.js";
+import { appendBookingToSheet, getNextBookingId, logHandoff, logNewChat, markHandoffRequested } from "./sheets.js";
 import { nanoid } from "nanoid";
 import {
   sendText,
@@ -195,7 +195,7 @@ async function routeInteractive(from, id, session) {
     session.step = "IDLE";
     await saveSession(from, session);
 
-    notifyTeamTemplate("new_chat_alert", `${from} (${LOCATIONS[key].label})`);
+    logNewChat(from, LOCATIONS[key].label).catch((e) => console.error("New chat logging failed:", errMsg(e)));
 
     await sendWelcome(from);
     return;
@@ -542,6 +542,7 @@ async function handOffToHuman(to) {
       "For urgent safety issues, please call us directly."
   );
   logHandoff(to).catch((e) => console.error("Handoff logging failed:", errMsg(e)));
+  markHandoffRequested(to).catch((e) => console.error("Mark handoff requested failed:", errMsg(e)));
   notifyTeamTemplate("handoff_alert", to);
 }
 

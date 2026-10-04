@@ -232,3 +232,46 @@ export async function logQuoteRequest(data) {
     console.error("Failed to log quote request:", err.response?.data || err.message);
   }
 }
+
+export async function logNewChat(phone, location) {
+  try {
+    const sheets = getClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "'New Chats'!A:D",
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[new Date().toISOString(), phone, location, ""]],
+      },
+    });
+  } catch (err) {
+    console.error("Failed to log new chat:", err.response?.data || err.message);
+  }
+}
+
+export async function markHandoffRequested(phone) {
+  try {
+    const sheets = getClient();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "'New Chats'!A:D",
+    });
+    const rows = res.data.values || [];
+    let targetIdx = -1;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i][1] === phone) {
+        targetIdx = i;
+        break;
+      }
+    }
+    if (targetIdx === -1) return;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: `'New Chats'!D${targetIdx + 1}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [["Handoff Requested"]] },
+    });
+  } catch (err) {
+    console.error("Failed to mark handoff requested:", err.response?.data || err.message);
+  }
+}
