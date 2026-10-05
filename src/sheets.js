@@ -254,7 +254,7 @@ export async function markHandoffRequested(phone) {
     const sheets = getClient();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'New Chats'!A:D",
+      range: "'Handoffs'!A:D",
     });
     const rows = res.data.values || [];
     let targetIdx = -1;
@@ -267,7 +267,7 @@ export async function markHandoffRequested(phone) {
     if (targetIdx === -1) return;
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: `'Timestamp'!D${targetIdx + 1}`,
+      range: `'Handoffs'!D${targetIdx + 1}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [["Handoff Requested"]] },
     });
