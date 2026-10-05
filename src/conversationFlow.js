@@ -543,7 +543,8 @@ async function handOffToHuman(to) {
   );
   logHandoff(to).catch((e) => console.error("Handoff logging failed:", errMsg(e)));
   markHandoffRequested(to).catch((e) => console.error("Mark handoff requested failed:", errMsg(e)));
-  notifyTeamTemplate("handoff_alert", to);
+  const locationLabel = session.draft.location ? ` (${session.draft.location})` : "";
+  notifyTeamTemplate("handoff_alert", `${to}${locationLabel}`);
 }
 
 /* -------------------------------------------------------------------------- */
