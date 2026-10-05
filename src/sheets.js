@@ -267,7 +267,7 @@ export async function markHandoffRequested(phone) {
     if (targetIdx === -1) return;
     await sheets.spreadsheets.values.update({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: `'New Chats'!D${targetIdx + 1}`,
+      range: `'Timestamp'!D${targetIdx + 1}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [["Handoff Requested"]] },
     });
