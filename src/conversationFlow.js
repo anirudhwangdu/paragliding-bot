@@ -15,6 +15,7 @@ import {
   errMsg,
 } from "./whatsappClient.js";
 import { getMediaId } from "./mediaCache.js";
+import { parseSiteBookingCode, handleSiteBooking } from "./siteBooking.js";
 
 const HANDOFF_KEYWORDS = ["human", "agent", "help me", "call me", "emergency", "injury", "complaint"];
 
@@ -40,6 +41,9 @@ function notifyTeamTemplate(templateName, text) {
 export async function handleIncomingMessage(from, message) {
   const text = extractText(message).trim();
   const lower = text.toLowerCase();
+
+  const siteCode = parseSiteBookingCode(text);
+  if (siteCode && (await handleSiteBooking(from, siteCode))) return;
 
   if (HANDOFF_KEYWORDS.some((k) => lower.includes(k))) {
     await handOffToHuman(from);
