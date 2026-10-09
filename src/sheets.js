@@ -275,3 +275,36 @@ export async function markHandoffRequested(phone) {
     console.error("Failed to mark handoff requested:", err.response?.data || err.message);
   }
 }
+
+const REQUIRED_TABS = {
+  "Conversations": ["Timestamp", "Phone", "Direction", "Message"],
+  "Handoffs": ["Timestamp", "Phone"],
+  "New Chats": ["Timestamp", "Phone", "Location", "Handoff Requested"],
+  "Quote Requests": ["Timestamp", "Package Type", "Guests", "Date", "Name", "Phone"],
+};
+
+export async function ensureTabs() {
+  try {
+    const sheets = getClient();
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: process.env.GOOGLE_SHEET_ID });
+    const existing = meta.data.sheets.map((s) => s.properties.title);
+    console.log("[Sheets] Existing tabs:", JSON.stringify(existing));
+
+    for (const [title, headers] of Object.entries(REQUIRED_TABS)) {
+      if (existing.includes(title)) continue;
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title } } }] },
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: `'${title}'!A1`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [headers] },
+      });
+      console.log(`[Sheets] Created missing tab: ${title}`);
+    }
+  } catch (err) {
+    console.error("[Sheets] ensureTabs failed:", err.response?.data || err.message);
+  }
+}

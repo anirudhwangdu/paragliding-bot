@@ -11,7 +11,7 @@ import {
   markReminderSent 
 } from "./src/sheets.js";
 import { refreshMedia } from "./src/mediaCache.js";
-import { getAllBookings, updateBookingField, getConversations, logQuoteRequest } from "./src/sheets.js";
+import { getAllBookings, updateBookingField, getConversations, logQuoteRequest, getBookingsNeedingReminder, markReminderSent, ensureTabs } from "./src/sheets.js";
 
 dotenv.config();
 
