@@ -6,10 +6,6 @@ import { sendText, sendTemplate, markRead } from "./src/whatsappClient.js";
 import { sendConfirmationEmail } from "./src/email.js";
 import { listBookings } from "./src/db.js";
 import { handleIncomingMessage, handleBulkFormSubmission } from "./src/conversationFlow.js";
-import {
-  getBookingsNeedingReminder,
-  markReminderSent 
-} from "./src/sheets.js";
 import { refreshMedia } from "./src/mediaCache.js";
 import { getAllBookings, updateBookingField, getConversations, logQuoteRequest, getBookingsNeedingReminder, markReminderSent, ensureTabs } from "./src/sheets.js";
 
@@ -763,6 +759,7 @@ load();
 
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
+  ensureTabs();
   processReminders();
   refreshMedia();
 });
