@@ -233,46 +233,63 @@ export async function logQuoteRequest(data) {
   }
 }
 
-export async function logNewChat(phone, location) {
-  try {
-    const sheets = getClient();
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'Handoffs and new chats'!A:D",
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[new Date().toISOString(), phone, location, ""]],
-      },
-    });
-  } catch (err) {
-    console.error("Failed to log new chat:", err.response?.data || err.message);
-  }
-}
+const SHEET = "'Handoffs and new chats'";
 
-export async function markHandoffRequested(phone) {
+// Compare phones by digits only so "+91 98765..." and "9198765..." match
+const normalize = (p) => String(p ?? "").replace(/\D/g, "");
+
+export async function logChatEvent(phone, { location = "", handoff = false } = {}) {
   try {
     const sheets = getClient();
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+    const append = (status) =>
+      sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${SHEET}!A:D`,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [[new Date().toISOString(), phone, location, status]],
+        },
+      });
+
+    // New chat: always a fresh row
+    if (!handoff) {
+      await append("");
+      return;
+    }
+
+    // Handoff: find this phone's latest row
     const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'Handoffs and new chats'!A:D",
+      spreadsheetId,
+      range: `${SHEET}!A:D`,
     });
     const rows = res.data.values || [];
-    let targetIdx = -1;
+
+    let idx = -1;
     for (let i = rows.length - 1; i >= 0; i--) {
-      if (rows[i][1] === phone) {
-        targetIdx = i;
+      if (normalize(rows[i][1]) === normalize(phone)) {
+        idx = i;
         break;
       }
     }
-    if (targetIdx === -1) return;
+
+    // No existing row: create one with location + handoff together
+    if (idx === -1) {
+      await append("Handoff Requested");
+      return;
+    }
+
+    // Update the existing row (keep its location, fill it in if empty)
+    const existingLocation = rows[idx][2] || location;
     await sheets.spreadsheets.values.update({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: `'Handoffs and new chats'!D${targetIdx + 1}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [["Handoff Requested"]] },
+      spreadsheetId,
+      range: `${SHEET}!C${idx + 1}:D${idx + 1}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[existingLocation, "Handoff Requested"]] },
     });
   } catch (err) {
-    console.error("Failed to mark handoff requested:", err.response?.data || err.message);
+    console.error("Failed to log chat event:", err.response?.data || err.message);
   }
 }
 
