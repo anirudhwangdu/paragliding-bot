@@ -199,7 +199,7 @@ export async function logHandoff(phone) {
     const sheets = getClient();
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'Handoffs and new chats'!A:B",
+      range: "'Handoffs and new chats'!A:D",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[new Date().toISOString(), phone]],
@@ -238,7 +238,7 @@ export async function logNewChat(phone, location) {
     const sheets = getClient();
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'New Chats'!A:D",
+      range: "'Handoffs and new chats'!A:D",
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[new Date().toISOString(), phone, location, ""]],
