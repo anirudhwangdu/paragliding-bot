@@ -194,22 +194,6 @@ export async function getConversations(phone) {
     .slice(-100);
 }
 
-export async function logHandoff(phone) {
-  try {
-    const sheets = getClient();
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "'Handoffs and new chats'!A:D",
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[new Date().toISOString(), phone]],
-      },
-    });
-  } catch (err) {
-    console.error("Failed to log handoff:", err.response?.data || err.message);
-  }
-}
-
 export async function logQuoteRequest(data) {
   try {
     const sheets = getClient();
@@ -292,6 +276,16 @@ export async function logChatEvent(phone, { location = "", handoff = false } = {
     console.error("Failed to log chat event:", err.response?.data || err.message);
   }
 }
+
+// Wrappers so existing imports and calls keep working
+export const logNewChat = (phone, location = "") =>
+  logChatEvent(phone, { location });
+
+export const markHandoffRequested = (phone, location = "") =>
+  logChatEvent(phone, { location, handoff: true });
+
+export const logHandoff = (phone, location = "") =>
+  logChatEvent(phone, { location, handoff: true });
 
 const REQUIRED_TABS = {
   "Conversations": ["Timestamp", "Phone", "Direction", "Message"],
