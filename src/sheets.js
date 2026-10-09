@@ -278,8 +278,7 @@ export async function markHandoffRequested(phone) {
 
 const REQUIRED_TABS = {
   "Conversations": ["Timestamp", "Phone", "Direction", "Message"],
-  "Handoffs": ["Timestamp", "Phone"],
-  "New Chats": ["Timestamp", "Phone", "Location", "Handoff Requested"],
+  "Handoffs": ["Timestamp", "Phone", "Location", "Handoff Requested"],
   "Quote Requests": ["Timestamp", "Package Type", "Guests", "Date", "Name", "Phone"],
 };
 
