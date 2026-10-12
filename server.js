@@ -753,6 +753,23 @@ load();
 </html>`;
 }
 
+
+app.get("/payment-proof/:mediaId", requireAuth, async (req, res) => {
+  const { mediaId } = req.params;
+  if (!/^\d+$/.test(mediaId)) return res.status(400).send("Invalid media id");
+  try {
+    const headers = { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` };
+    const meta = await axios.get(`https://graph.facebook.com/v20.0/${mediaId}`, { headers });
+    const file = await axios.get(meta.data.url, { headers, responseType: "arraybuffer" });
+    res.set("Content-Type", meta.data.mime_type || "application/octet-stream");
+    res.set("Cache-Control", "private, max-age=3600");
+    res.send(file.data);
+  } catch (err) {
+    console.error("Payment proof fetch failed:", err.response?.status, err.message);
+    res.status(404).send("Screenshot not available. Meta only keeps received media for a limited time.");
+  }
+});
+
 /* -------------------------------------------------------------------------- */
 /*  Start server (must be last)                                                */
 /* -------------------------------------------------------------------------- */

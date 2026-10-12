@@ -39,6 +39,11 @@ function notifyTeamTemplate(templateName, text) {
 /* -------------------------------------------------------------------------- */
 
 export async function handleIncomingMessage(from, message) {
+  if (message.type === "image" || message.type === "document") {
+    await handlePaymentProof(from, message);
+    return;
+  }
+
   const text = extractText(message).trim();
   const lower = text.toLowerCase();
 
@@ -566,4 +571,48 @@ function extractText(message) {
 function extractInteractiveId(message) {
   if (message.type !== "interactive") return null;
   return message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || null;
+}
+
+
+async function handlePaymentProof(from, message) {
+  const mediaId = message.image?.id || message.document?.id;
+  const session = getSession(from);
+
+  let booking = null;
+  try {
+    booking = await findLatestBookingByPhone(from);
+  } catch (e) {
+    console.error("Booking lookup failed:", errMsg(e));
+  }
+
+  if (!booking || !mediaId) {
+    if (session.step !== "HUMAN") {
+      await sendText(
+        from,
+        "Thanks for the image! We couldn't match it to a recent booking. If this is a payment screenshot, please type \"human\" and our team will help."
+      );
+    }
+    return;
+  }
+
+  const baseUrl = process.env.PUBLIC_BASE_URL || "https://paragliding-bot.onrender.com";
+  const link = `${baseUrl}/payment-proof/${mediaId}`;
+
+  try {
+    await updateBookingField(
+      booking.rowIndexes,
+      "Payment Screenshot",
+      `=HYPERLINK("${link}","View payment proof")`
+    );
+  } catch (e) {
+    console.error("Saving payment screenshot failed:", errMsg(e));
+    await sendText(from, "We received your image but had trouble saving it. Please type \"human\" and our team will assist.");
+    return;
+  }
+
+  const ref = booking.customerRef ? ` *${booking.customerRef}*` : "";
+  await sendText(
+    from,
+    `✅ Thanks! We've received your payment screenshot for booking${ref}. Our team will verify it and confirm your slot shortly.`
+  );
 }

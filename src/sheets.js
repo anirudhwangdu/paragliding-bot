@@ -318,3 +318,13 @@ export async function ensureTabs() {
     console.error("[Sheets] ensureTabs failed:", err.response?.data || err.message);
   }
 }
+
+export async function findLatestBookingByPhone(phone) {
+  const bookings = await getAllBookings();
+  const clean = String(phone).replace(/\D/g, "");
+  return bookings.find(
+    (b) =>
+      String(b.phone || "").replace(/\D/g, "") === clean &&
+      (b.status || "").toLowerCase() !== "cancelled"
+  );
+}
