@@ -433,12 +433,31 @@ async function routeInteractive(from, id, session) {
 
     if (process.env.HUMAN_HANDOFF_NUMBER) {
       try {
-        await sendText(
+        // Template params can't be empty or contain newlines/tabs, so sanitize each one
+        const param = (v) => ({
+          type: "text",
+          text: String(v ?? "-").replace(/[\r\n\t]+/g, " ").trim() || "-",
+        });
+
+        await sendTemplate(
           process.env.HUMAN_HANDOFF_NUMBER,
-          `🆕 New booking ${booking.id}\n${booking.location} — ${booking.package}\n` +
-            `Passengers (${booking.passengerCount}):\n${paxSummary}\n` +
-            `Date: ${booking.date} · ${booking.timePreference}\n` +
-            `Phone: ${booking.phone} · Email: ${booking.email}`
+          "YOUR_TEMPLATE_NAME", // exact name of the approved template in Meta
+          "en",                 // must match the language the template was approved in
+          [
+            {
+              type: "body",
+              parameters: [
+                param(booking.id),             // {{1}}
+                param(booking.location),       // {{2}}
+                param(booking.package),        // {{3}}
+                param(booking.passengerCount), // {{4}}
+                param(booking.date),           // {{5}}
+                param(booking.timePreference), // {{6}}
+                param(booking.phone),          // {{7}}
+                param(booking.email),          // {{8}}
+              ],
+            },
+          ]
         );
       } catch (e) {
         console.error("[ALERT] Booking alert to team failed:", errMsg(e));
