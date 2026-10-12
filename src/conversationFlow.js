@@ -1,7 +1,7 @@
 import { getSession, saveSession, resetSession, saveBooking, hasSession } from "./db.js";
 import { FAQ, FAQ_MENU_SECTIONS } from "./faq.js";
 import { LOCATIONS, findPackage, CORPORATE_DETAILS, CAMPING_DETAILS } from "./packages.js";
-import { appendBookingToSheet, getNextBookingId, logHandoff, logNewChat, markHandoffRequested } from "./sheets.js";
+import { appendBookingToSheet, getNextBookingId, logHandoff, logNewChat, markHandoffRequested, updateBookingField, findLatestBookingByPhone } from "./sheets.js";
 import { nanoid } from "nanoid";
 import {
   sendText,
