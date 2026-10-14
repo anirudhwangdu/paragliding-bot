@@ -410,7 +410,7 @@ app.post("/booking-confirmed", express.json(), async (req, res) => {
       { type: "text", text: String(passengerCount) },
       { type: "text", text: String(advance) },
       { type: "text", text: String(balance) },
-      { type: "text", text: "89517 71232" },
+      { type: "text", text: phone },
     ];
 
     await sendTemplate(phone, templateName, "en", [{ type: "body", parameters: params }]);
