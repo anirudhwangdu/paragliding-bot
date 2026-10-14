@@ -544,7 +544,7 @@ app.post("/api/booking-action", requireAuth, express.json(), async (req, res) =>
         { type: "text", text: String(booking.passengerCount) },
         { type: "text", text: String(booking.advance) },
         { type: "text", text: String(booking.balance) },
-        { type: "text", text: String(booking.phone) },
+        { type: "text", text: booking.phone },
       ];
       await sendTemplate(booking.phone, templateName, "en", [{ type: "body", parameters: params }]);
       if (process.env.HUMAN_HANDOFF_NUMBER) {
