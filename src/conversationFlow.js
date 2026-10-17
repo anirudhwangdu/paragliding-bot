@@ -441,7 +441,7 @@ async function routeInteractive(from, id, session) {
 
         await sendTemplate(
           process.env.HUMAN_HANDOFF_NUMBER,
-          "YOUR_TEMPLATE_NAME", // exact name of the approved template in Meta
+          "new_booking_alert", // exact name of the approved template in Meta
           "en",                 // must match the language the template was approved in
           [
             {
