@@ -377,6 +377,7 @@ async function processReminders() {
               { type: "text", text: b.date },
               { type: "text", text: b.timePref },
               { type: "text", text: `${b.name}, ${b.phone}` },
+              { type: "text", text: b.location }
             ],
           },
         ]);
