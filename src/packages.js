@@ -26,7 +26,7 @@ export const LOCATIONS = {
             details: "🪂 Tandem Introductory Flight\n₹3,999/person\nDuration: 7 min | Altitude: up to 1,000ft MSL\nIdeal for first-time flyers seeking a gentle intro to the sky." },
           { id: "blr_classicthr", title: "SkySail Thriller Flight", description: "₹6,999/person · 12 min · up to 2000ft", priceValue: 6999, unit: "person",
             details: "🪂 SkySail Thriller Flight\n₹6,999/person\nDuration: 12 min | Altitude: up to 2,000ft MSL\nIdeal for thrill-seekers looking for daring turns and higher adrenaline." },
-          { id: "blr_birthday", title: "Birthday Blast Off!", description: "₹6,999/person · 15 min · birthday special", priceValue: 6999, unit: "person",
+          { id: "blr_birthday", title: "Birthday Blast Off!", description: "₹6,999/person · 15 min · birthday special", priceValue: 7999, unit: "person",
             details: "🪂 Birthday Blast Off!\n₹7,999/person\nDuration: 15 min | Altitude: up to 2,000ft MSL\nIdeal for special birthday celebrations and surprises." },
           { id: "blr_pet", title: "Fluff 'n' Flight", description: "₹6,999/pair · 15 min · 1 adult + 1 pet", priceValue: 6999, unit: "flat",
             details: "🪂 Fluff 'n' Flight\n₹6,999/pair\nDuration: 15 min | Altitude: up to 1,500ft MSL\nIncludes: 1 adult + 1 pet tandem flight." },
